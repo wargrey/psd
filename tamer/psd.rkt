@@ -1,9 +1,12 @@
 #lang racket
 
 (require "../main.rkt")
-(require images/flomap)
 
-(define test.psd (new psd% [path "test.psd"]))
+(require racket/runtime-path)
 
-(send test.psd desc)
-(flomap->bitmap #:backing-scale 2.0 (send test.psd get-image))
+(define-runtime-path ./test.psd "test.psd")
+
+(define test.psd (read-psd ./test.psd))
+test.psd
+;(send test.psd desc)
+;(flomap->bitmap #:backing-scale 2.0 (send test.psd get-image))

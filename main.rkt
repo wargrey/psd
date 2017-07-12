@@ -1,4 +1,5 @@
-#lang racket
+#lang typed/racket/base
 
-(provide psd%)
-(require "digitama/psd.rkt")
+(provide (all-from-out "psd.rkt"))
+
+(require "psd.rkt")
