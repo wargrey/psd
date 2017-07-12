@@ -32,12 +32,13 @@
   [0 Raw RLE ZIP ZIP/prediction])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define select-psd-file : (-> Path-String Boolean Path-String)
-  (lambda [src.psd try?]
-    (cond [(not try?) src.psd]
+(define select-psd-file : (-> Path-String Positive-Real Boolean (Values Path-String Positive-Real))
+  (lambda [src.psd density try?]
+    (cond [(not try?) (values src.psd density)]
           [else (let* ([path.psd : String (if (string? src.psd) src.psd (path->string src.psd))]
                        [path@2x.psd : String (regexp-replace #rx"([.][^.]*|)$" path.psd "@2x\\1")])
-                  (if (file-exists? path@2x.psd) path@2x.psd path.psd))])))
+                  (cond [(not (file-exists? path@2x.psd)) (values path.psd density)]
+                        [else (values path@2x.psd (+ density density))]))])))
 
 (define read-psd-header : (-> Input-Port (Values Positive-Byte Positive-Byte Positive-Index Positive-Index Positive-Byte PSD-Color-Mode))
   (lambda [/dev/psdin]
@@ -50,8 +51,8 @@
     (read-nbytes* /dev/psdin 6)                          ; reserved
     (values version
             (read-integer /dev/psdin 2 #false positive-byte?)   ; channels
-            (read-integer /dev/psdin 4 #false positive-index?) ; height
-            (read-integer /dev/psdin 4 #false positive-index?) ; width
+            (read-integer /dev/psdin 4 #false positive-index?)  ; height
+            (read-integer /dev/psdin 4 #false positive-index?)  ; width
             (read-integer /dev/psdin 2 #false positive-byte?)   ; depth
             (integer->color-mode (read-integer /dev/psdin 2 #false)))))
 
