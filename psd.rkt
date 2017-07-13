@@ -12,8 +12,8 @@
   #:transparent #:constructor-name use-read-psd-instead
   #:property prop:convertible
   (λ [[self : PSD] [request : Symbol] [default : Any]]
-    (with-handlers ([exn? void]) (convert (psd->bitmap self) request default))
-    #false))
+    (with-handlers ([exn? (λ [[e : exn]] #false)])
+      (convert (psd->bitmap self) request default))))
 
 (define read-psd : (->* ((U Path-String Input-Port)) (#:backing-scale Positive-Real #:try-@2x? Boolean) PSD)
   (lambda [/dev/psdin #:backing-scale [density 1.0] #:try-@2x? [try-@2x? #false]]

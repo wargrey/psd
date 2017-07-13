@@ -4,7 +4,7 @@
 
 (require racket/runtime-path)
 
-(define-runtime-path tamer/ ".")
+(define-runtime-path tamer/ "./samples")
 (define (psd? path) (regexp-match? #px"[^@][^2][^x][.]psd$" path))
 
 (for/list ([file.psd (in-directory tamer/)] #:when (psd? file.psd))
