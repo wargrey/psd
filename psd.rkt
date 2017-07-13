@@ -19,7 +19,7 @@
   #:extra-constructor-name make-psd
   #:property prop:convertible
   (λ [[self : PSD] [request : Symbol] [default : Any]]
-    (convert (psd->bitmap self) request default)))
+    (convert (time (psd->bitmap self)) request default)))
 
 (define read-psd : (->* ((U Path-String Input-Port)) (#:backing-scale Positive-Real #:try-@2x? Boolean) PSD)
   (lambda [/dev/psdin #:backing-scale [density 1.0] #:try-@2x? [try-@2x? #false]]

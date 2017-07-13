@@ -48,13 +48,8 @@
 
 (define parse-nbytes-list : (-> Bytes (Listof Index) Index (Listof Bytes))
   (lambda [src bsizes start]
-    (let parse ([last-end : Fixnum start]
-                [sizes : (Listof Index) bsizes]
-                [dest : (Listof Bytes) null])
-      (cond [(null? sizes) (reverse dest)]
-            [else (let ([size (car sizes)])
-                    (define bs : Bytes (parse-nbytes src size (assert last-end index?)))
-                    (parse (fx+ size last-end) (cdr sizes) (cons bs dest)))]))))
+    (for/list : (Listof Bytes) ([interval (in-list (nbytes-pairs bsizes start))])
+      (subbytes src (car interval) (cdr interval)))))
 
 #;(define read-8BIMs : (->* (Integer) (Input-Port) (Listof Bytes))
   (lambda [smart-size [/dev/psdin (current-input-port)]]
@@ -70,6 +65,15 @@
   (lambda [flg bp]
     (let ([b (arithmetic-shift 1 bp)])
       (= (bitwise-and flg b) b))))
+
+(define nbytes-pairs : (-> (Listof Index) Index (Listof (Pairof Integer Integer)))
+  (lambda [bsizes start]
+    (let parse ([last-end : Fixnum start]
+                [sizes : (Listof Index) bsizes]
+                [dest : (Listof (Pairof Integer Integer)) null])
+      (cond [(null? sizes) (reverse dest)]
+            [else (let ([next-end (fx+ last-end (car sizes))])
+                    (parse next-end (cdr sizes) (cons (cons last-end next-end) dest)))]))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define read-bytes* : (-> Input-Port Integer Bytes)

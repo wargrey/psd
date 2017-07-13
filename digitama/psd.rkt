@@ -5,9 +5,9 @@
 (require racket/fixnum)
 (require racket/port)
 
-(require "rle.rkt")
 (require "misc.rkt")
 (require "parser.rkt")
+(require "packbits.rkt")
 (require "unsafe/bitmap.rkt")
 
 (struct psd-header
@@ -71,10 +71,12 @@
     (unless (or (fx= channels 3) (fx= channels 4)) (throw-unsupported-error func "inproper channel count: ~a" channels))
     (case compression
       [(Raw) (planar-data->bitmap planar-data width height channels density)]
-      [(RLE) (let* ([scan-lines (assert (fx* height channels) index?)]
-                    [data-index (assert (fx* scan-lines 2) index?)])
+      [(RLE) (let* ([data-index (assert (fx* (fx* height channels) 2) index?)]
+                    [scan-lines (fxquotient data-index 2)])
                (define sizes : (Listof Index) (parse-nsizes-list planar-data scan-lines 2 0))
-               (planar-data->bitmap (map unpackbits (parse-nbytes-list planar-data sizes data-index))
+               (define intervals : (Listof (Pairof Integer Integer)) (nbytes-pairs sizes data-index))
+               (planar-data->bitmap (for/list : (Listof Bytes) ([interval (in-list intervals)])
+                                      (unpackbits width planar-data (car interval) (cdr interval)))
                                     width height channels density))]
       [else (throw-unsupported-error func "unimplemented compression method: ~a" compression)])))
 

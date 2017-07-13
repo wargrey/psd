@@ -9,7 +9,7 @@
 (require racket/flonum)
 (require images/flomap)
 
-(require "rle.rkt")
+(require "packbits.rkt")
 
 (define {bytes->int bs [signed? #true]}
   (integer-bytes->integer bs signed? #true))
@@ -268,46 +268,4 @@
                                (member (send psd-layer get-name) names))
                       (when (void? (mcdr layer-image))
                         (set-mcdr! layer-image (send psd-layer get-image)))
-                      (mcdr layer-image)))))
-    
-    (define/public {get-image}
-      (when (bytes? image-data)
-        (define bs (case ~compression
-                     [{0} image-data]
-                     [{1} (with-input-from-bytes image-data
-                            {thunk (define rows (build-list (* ~height ~channels) {lambda [whocares] (read-int 2)}))
-                                   (apply bytes-append (map unpackbits (read-bytes-seq rows)))})]
-                     [else (error 'psd% "Unimplemented compression method: ~a" ~compression)]))
-        (define total (/ (bytes-length bs) ~channels))
-        (define pixels (make-flvector (bytes-length bs)))
-        (for ([nth (in-range total)])
-          (case ~channels
-            [{3} (let ([pos (* nth ~channels)])
-                   (for ([off (in-range 3)]) (flvector-set! pixels (+ pos off) (fl/ (fx->fl (bytes-ref bs (+ nth (* off total)))) 255.0))))]
-            [{4} (let ([alpha (fl/ (fx->fl (bytes-ref bs (+ nth total total total))) 255.0)]
-                       [pos (* nth ~channels)])
-                   (flvector-set! pixels (+ pos 0) alpha)
-                   (for ([off (in-range 3)]) (flvector-set! pixels (+ pos off 1) (fl* alpha (fl/ (fx->fl (bytes-ref bs (+ nth (* off total)))) 255.0)))))]
-            [else (error 'psd% "Inproper channel count: ~a" ~channels)]))
-        (set! image-data (flomap pixels ~channels ~width ~height)))
-      image-data)
-    
-    (define/public {desc [out (current-output-port)]}
-      (fprintf out (foldr string-append ""
-                          (add-between (list "~a Object:" "Size: [~a * ~a]" "Channels: ~a" "Depth: ~a" "Color Mode: ~a"
-                                             "Compression Method: ~a" "Resources Count: ~a~a" "Global Mask: ~a" "Tagged Blocks: ~a~a~n")
-                                       "~n    "))
-               (case ~version [{1} 'PSD] [{2} 'PSB]) ~width ~height ~channels ~depth
-               (list-ref '{Bitmap Grayscale Indexed RGB CMYK Multichannel Duotone Lab} ~color-mode)
-               (list-ref '{Raw RLE ZIP-no-prediction ZIP-with-prediction} ~compression)
-               (hash-count image-resources) (hash-keys image-resources)
-               (cond [(zero? (hash-count global-mask)) "None"]
-                     [(= 128 (hash-ref global-mask 'kind)) "Use value stored per layer"]
-                     [else global-mask])
-               (hash-count tagged-blocks) (hash-keys tagged-blocks))
-      
-      (fprintf out "~n    Layer Count: ~a~n" (vector-length layers))
-      (for ([index (in-range (sub1 (vector-length layers)) -1 -1)])
-        (send (vector-ref layers index) folder?)
-        (send (vector-ref layers index) desc "        " out)
-        (newline)))})
+                      (mcdr layer-image)))))})

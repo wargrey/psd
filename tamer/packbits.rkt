@@ -1,6 +1,6 @@
 #lang typed/racket/base
 
-(require "../digitama/rle.rkt")
+(require "../digitama/packbits.rkt")
 
 (require typed/rackunit)
 (require typed/rackunit/text-ui)
@@ -12,6 +12,15 @@
 (define tests-from-wikipedia
   (test-suite
    "Run-length Encoding"
-   (check-equal? out (unpackbits in))))
+   (check-equal? out (unpackbits in))
+   (check-equal? out (unpackbits (bytes-length out) in))))
 
 (run-tests tests-from-wikipedia)
+
+
+(define out! : Bytes (make-bytes (bytes-length out)))
+(define end (bytes-length in))
+(collect-garbage)
+(time (for ([i (in-range 100000)]) (unpackbits! out! 0 in 0 end)))
+(collect-garbage)
+(time (for ([i (in-range 100000)]) (unpackbits* in 0 end)))
