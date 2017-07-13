@@ -19,6 +19,11 @@
    [color : PSD-Color-Mode])
   #:transparent)
 
+(struct psd-data psd-header
+  ([compression : PSD-Compression-Mode]
+   [density : Positive-Real])
+  #:transparent)
+
 (define-enumeration* psd-version #:+> PSD-Version ; order matters
   version->integer integer->version
   [1 PSD PSB])
