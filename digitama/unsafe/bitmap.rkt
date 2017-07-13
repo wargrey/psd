@@ -1,17 +1,16 @@
 #lang typed/racket/base
 
 (provide ~size planar-data->bitmap)
-(provide Bitmap% prop:convertible convert)
 
-(require (only-in typed/racket/draw Bitmap%))
 (require typed/racket/unsafe)
 
+(require "../draw.rkt")
+
 (module unsafe racket/base
-  (provide (all-defined-out) prop:convertible convert)
+  (provide (all-defined-out))
   
   (require racket/draw/unsafe/cairo)
   (require racket/unsafe/ops)
-  (require file/convertible)
 
   (require (only-in racket/class send))
   (require (only-in racket/draw make-bitmap))
@@ -76,7 +75,5 @@
 
 (unsafe-require/typed
  (submod "." unsafe)
- [prop:convertible Struct-Type-Property]
- [convert (->* ((Instance Bitmap%) Symbol) (Any) Any)]
  [~size (-> Positive-Index Positive-Real Positive-Index)]
  [planar-data->bitmap (-> (U Bytes (Listof Bytes)) Positive-Fixnum Positive-Fixnum Byte Positive-Real (Instance Bitmap%))])

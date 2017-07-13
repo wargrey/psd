@@ -5,8 +5,10 @@
 (provide (all-defined-out))
 
 (require "digitama/psd.rkt")
+(require "digitama/draw.rkt")
+(require "digitama/stdin.rkt")
+(require "digitama/bitmap.rkt")
 (require "digitama/misc.rkt")
-(require "digitama/unsafe/bitmap.rkt")
 
 (struct: psd : PSD psd-section ([density : Positive-Real])
   #:transparent #:constructor-name use-read-psd-instead
@@ -36,6 +38,29 @@
           (psd-image-data->bitmap 'read-psd-as-bitmap image-data color-mode width height channels depth compression density))
         (let-values ([(path scale) (select-psd-file /dev/psdin density try-@2x?)])
           (call-with-input-file* path (λ [[psdin : Input-Port]] (read-psd-as-bitmap psdin #:backing-scale scale)))))))
+
+#;(define psd-image-resources : (-> PSD PSD-Image-Resources)
+  (lambda [self]
+    (define maybe-res : (U (Instance Bitmap%) Special-Comment) (psd-section-resources self))
+    (cond [(not (special-comment? maybe-res)) maybe-res]
+          [else (let ([resource-data : Bytes (assert (special-comment-value maybe-res) bytes?)])
+                  (define bmp : (Instance Bitmap%)
+                    (psd-image-data->bitmap 'psd->bitmap image-data (psd-header-color-mode self)
+                                            (psd-header-width self) (psd-header-height self)
+                                            (psd-header-channels self) (psd-header-depth self)
+                                            (psd-section-compression-mode self) (psd-density self)))
+                  (set-psd-section-image! self bmp)
+                  bmp)])
+    (with-input-from-bytes resource-data
+        {thunk (define read-record
+                 {lambda [res]
+                   (let ([skip-8BIM (read-bytes 4 res)]
+                         [id (read-int 2 res)])
+                     (cons id (mcons (second (regexp-match #px#"((?:[^\0][^\0])*)\0\0" res))
+                                    (let ([len (read-int 4 res)])
+                                      (read-bytes len res)))))})
+               (make-hash (map (curryr call-with-input-bytes read-record) (regexp-match* #px#"8BIM(.(?!8BIM))+." (current-input-port))))})
+    null))
 
 (define psd->bitmap : (-> PSD (Instance Bitmap%))
   (lambda [self]

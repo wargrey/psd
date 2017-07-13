@@ -2,13 +2,10 @@
 
 (provide (all-defined-out))
 
-(require racket/fixnum)
-(require racket/port)
-
+(require "draw.rkt")
 (require "misc.rkt")
-(require "parser.rkt")
-(require "packbits.rkt")
-(require "unsafe/bitmap.rkt")
+
+(define-type PSD-Image-Resources (Listof (Pairof Natural Any)))
 
 (struct psd-header
   ([version : PSD-Version]
@@ -21,7 +18,7 @@
 
 (struct psd-section psd-header
   ([color-data : Special-Comment]
-   [resources : Special-Comment]
+   [resources : (U PSD-Image-Resources Special-Comment)]
    [layers : Special-Comment]
    [compression-mode : PSD-Compression-Mode]
    [image : (U (Instance Bitmap%) Special-Comment)])
@@ -39,59 +36,3 @@
 (define-enumeration* psd-compression-mode #:+> PSD-Compression-Mode ; order matters
   compression-mode->integer integer->compression-mode
   [0 Raw RLE ZIP ZIP/prediction])
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define select-psd-file : (-> Path-String Positive-Real Boolean (Values Path-String Positive-Real))
-  (lambda [src.psd density try?]
-    (cond [(not try?) (values src.psd density)]
-          [else (let* ([path.psd : String (if (string? src.psd) src.psd (path->string src.psd))]
-                       [path@2x.psd : String (regexp-replace #rx"([.][^.]*|)$" path.psd "@2x\\1")])
-                  (cond [(not (file-exists? path@2x.psd)) (values path.psd density)]
-                        [else (values path@2x.psd (+ density density))]))])))
-
-(define read-psd-header : (-> Input-Port (Values Positive-Byte Positive-Byte Positive-Index Positive-Index Positive-Byte PSD-Color-Mode))
-  (lambda [/dev/psdin]
-    (define signature : Bytes (read-nbytes* /dev/psdin 4))
-    (define version : Integer (read-integer /dev/psdin 2 #false))
-    
-    (unless (and (equal? signature #"8BPS") (or (= version 1) (= version 2)))
-      (raise-user-error 'read-psd-header "this is not a valid PSD/PSB file: ~a" (object-name /dev/psdin)))
-    
-    (read-nbytes* /dev/psdin 6) ; reserved
-    (values version
-            (read-integer /dev/psdin 2 #false positive-byte?)   ; channels
-            (read-integer /dev/psdin 4 #false positive-index?)  ; height
-            (read-integer /dev/psdin 4 #false positive-index?)  ; width
-            (read-integer /dev/psdin 2 #false positive-byte?)   ; depth
-            (integer->color-mode (read-integer /dev/psdin 2 #false)))))
-
-(define read-psd-section : (-> Input-Port Byte (Values Bytes Bytes Bytes PSD-Compression-Mode Bytes))
-  (lambda [/dev/psdin version]
-    (values (read-n:bytes /dev/psdin 4)               ; color mode data
-            (read-n:bytes /dev/psdin 4)               ; image resources
-            (read-n:bytes /dev/psdin (fx* 4 version)) ; layer+mask information
-            (integer->compression-mode (read-integer /dev/psdin 2 #false))
-            (port->bytes /dev/psdin))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define psd-image-data->bitmap : (-> Symbol Bytes PSD-Color-Mode Positive-Index Positive-Index Positive-Byte Positive-Byte
-                                     PSD-Compression-Mode Positive-Real (Instance Bitmap%))
-  (lambda [func planar-data color-mode width height channels depth compression density]
-    (unless (eq? color-mode 'RGB) (throw-unsupported-error func "unimplemeneted color mode: ~a" color-mode))
-    (unless (fx= depth 8) (throw-unsupported-error func "unimplemeneted depth : ~a-bpc" depth))
-    (unless (or (fx= channels 3) (fx= channels 4)) (throw-unsupported-error func "unimplemented channel count: ~a" channels))
-    (case compression
-      [(Raw) (planar-data->bitmap planar-data width height channels density)]
-      [(RLE) (let* ([data-index (assert (fx* (fx* height channels) 2) index?)]
-                    [scan-lines (fxquotient data-index 2)])
-               (define sizes : (Listof Index) (parse-nsizes-list planar-data scan-lines 2 0))
-               (define intervals : (Listof (Pairof Integer Integer)) (nbytes-pairs sizes data-index))
-               (planar-data->bitmap (for/list : (Listof Bytes) ([interval (in-list intervals)])
-                                      (unpackbits width planar-data (car interval) (cdr interval)))
-                                    width height channels density))]
-      [else (throw-unsupported-error func "unimplemented compression method: ~a" compression)])))
-
-(define throw-unsupported-error : (-> Symbol String Any * Nothing)
-  (lambda [func fmt . args]
-    (raise (make-exn:fail:unsupported (apply format (string-append "~a: " fmt) func args)
-                                      (continuation-marks #false)))))

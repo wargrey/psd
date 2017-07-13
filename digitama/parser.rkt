@@ -6,20 +6,6 @@
 
 (require racket/fixnum)
 
-(define positive-byte? : (-> Any Boolean : Positive-Byte) (λ [v] (and (byte? v) (> v 0))))
-(define positive-index? : (-> Any Boolean : Positive-Index) (λ [v] (and (index? v) (> v 0))))
-
-(define read-n:bytes : (-> Input-Port Fixnum Bytes)
-  (lambda [/dev/psdin size]
-    (read-nbytes* /dev/psdin (read-integer /dev/psdin size #false))))
-
-(define read-integer : (All (a) (case-> [Input-Port Fixnum Boolean -> Integer]
-                                        [Input-Port Fixnum Boolean (-> Any Boolean : a) -> a]))
-  (case-lambda
-    [(/dev/psdin bsize signed?) (integer-bytes->integer (read-bytes* /dev/psdin bsize) signed? #true 0 bsize)]
-    [(/dev/psdin bsize signed? subinteger?) (assert (read-integer /dev/psdin bsize signed?) subinteger?)]))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define parse-integer : (All (a) (case-> [Bytes Index Boolean Index -> Integer]
                                          [Bytes Index Boolean (-> Any Boolean : a) Index -> a]))
   (case-lambda
@@ -51,6 +37,7 @@
     (for/list : (Listof Bytes) ([interval (in-list (nbytes-pairs bsizes start))])
       (subbytes src (car interval) (cdr interval)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 #;(define read-8BIMs : (->* (Integer) (Input-Port) (Listof Bytes))
   (lambda [smart-size [/dev/psdin (current-input-port)]]
     (if (regexp-match-peek #px#"^8B(IM|64)" in)
@@ -74,21 +61,3 @@
       (cond [(null? sizes) (reverse dest)]
             [else (let ([next-end (fx+ last-end (car sizes))])
                     (parse next-end (cdr sizes) (cons (cons last-end next-end) dest)))]))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define read-bytes* : (-> Input-Port Integer Bytes)
-  (lambda [/dev/psdin size]
-    (define bs : (U Bytes EOF) (read-bytes size /dev/psdin))
-    (if (bytes? bs) bs (throw-eof-error /dev/psdin))))
-
-(define read-nbytes* : (-> Input-Port Integer Bytes)
-  (lambda [/dev/psdin size]
-    (define bs : (U Bytes EOF) (read-bytes size /dev/psdin))
-    (cond [(and (bytes? bs) (= (bytes-length bs) size)) bs]
-          [else (throw-eof-error /dev/psdin)])))
-
-(define throw-eof-error : (-> Input-Port Nothing)
-  (lambda [/dev/psdin]
-    (raise (make-exn:fail:read:eof "unexpected end of file!"
-                                   (continuation-marks #false)
-                                   null))))
