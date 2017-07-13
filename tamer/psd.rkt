@@ -1,17 +1,15 @@
 #lang racket
 
-(require "../main.rkt")
+(require "../psd.rkt")
 
 (require racket/runtime-path)
 
 (define-runtime-path tamer/ ".")
 (define (psd? path) (regexp-match? #px"[^@][^2][^x][.]psd$" path))
 
-
 (for/list ([file.psd (in-directory tamer/)] #:when (psd? file.psd))
   (define tamer.psd (read-psd file.psd #:try-@2x? #false))
-  (list (path->string (file-name-from-path file.psd))
-        (format "~a" tamer.psd)
+  (cons (path->string (file-name-from-path file.psd))
         tamer.psd))
 
 #|

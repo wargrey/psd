@@ -4,28 +4,27 @@
 
 (provide (all-defined-out))
 
-(require "digitama/parser.rkt")
 (require "digitama/psd.rkt")
 (require "digitama/misc.rkt")
 (require "digitama/unsafe/bitmap.rkt")
 
-(struct: psd : PSD psd-data
-  ([color : Bytes]
-   [resources : Bytes]
-   [layers : Bytes]
-   [image : (Boxof (U Bytes (Instance Bitmap%)))])
-  #:extra-constructor-name make-psd
+(struct: psd : PSD psd-section ([density : Positive-Real])
+  #:transparent #:constructor-name use-read-psd-instead
   #:property prop:convertible
   (λ [[self : PSD] [request : Symbol] [default : Any]]
-    (convert (psd->bitmap self) request default)))
+    (convert (psd->bitmap self) request default)
+    #false))
 
 (define read-psd : (->* ((U Path-String Input-Port)) (#:backing-scale Positive-Real #:try-@2x? Boolean) PSD)
   (lambda [/dev/psdin #:backing-scale [density 1.0] #:try-@2x? [try-@2x? #false]]
     (if (input-port? /dev/psdin)
         (let*-values ([(version channels height width depth color-mode) (read-psd-header /dev/psdin)]
                       [(color-mode-data image-resources layer+mask-info compression-mode image-data) (read-psd-section /dev/psdin version)])
-          (make-psd (integer->version version) channels width height depth color-mode compression-mode density 
-                    color-mode-data image-resources layer+mask-info (box image-data)))
+          (use-read-psd-instead (integer->version version) channels width height depth color-mode 
+                                (make-special-comment color-mode-data)
+                                (make-special-comment image-resources)
+                                (make-special-comment layer+mask-info)
+                                compression-mode (make-special-comment image-data) density))
         (let-values ([(path scale) (select-psd-file /dev/psdin density try-@2x?)])
           (call-with-input-file* path (λ [[psdin : Input-Port]] (read-psd psdin #:backing-scale scale)))))))
 
@@ -40,19 +39,19 @@
 
 (define psd->bitmap : (-> PSD (Instance Bitmap%))
   (lambda [self]
-    (define &bmp : (Boxof (U Bytes (Instance Bitmap%))) (psd-image self))
-    (define maybe-bmp : (U Bytes (Instance Bitmap%)) (unbox &bmp))
-    (cond [(not (bytes? maybe-bmp)) maybe-bmp]
-          [else (let ([bmp (psd-image-data->bitmap 'psd->bitmap maybe-bmp
-                                                   (psd-header-width self) (psd-header-height self)
-                                                   (psd-header-channels self) (psd-data-compression self)
-                                                   (psd-data-density self))])
-                  (set-box! &bmp bmp)
+    (define maybe-bmp : (U (Instance Bitmap%) Special-Comment) (psd-section-image self))
+    (cond [(not (special-comment? maybe-bmp)) maybe-bmp]
+          [else (let ([image-data : Bytes (assert (special-comment-value maybe-bmp) bytes?)])
+                  (define bmp : (Instance Bitmap%)
+                    (psd-image-data->bitmap 'psd->bitmap image-data
+                                            (psd-header-width self) (psd-header-height self) (psd-header-channels self)
+                                            (psd-section-compression self) (psd-density self)))
+                  (set-psd-section-image! self bmp)
                   bmp)])))
 
 (define psd-size : (-> PSD (Values Positive-Index Positive-Index))
   (lambda [self]
-    (define density : Positive-Real (psd-data-density self))
+    (define density : Positive-Real (psd-density self))
     (values (~size (psd-header-width self) density)
             (~size (psd-header-height self) density))))
 
