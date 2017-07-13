@@ -8,7 +8,7 @@
 (define (psd? path) (regexp-match? #px"[^@][^2][^x][.]psd$" path))
 
 (for/list ([file.psd (in-directory tamer/)] #:when (psd? file.psd))
-  (define tamer.psd (read-psd file.psd #:try-@2x? #false))
+  (define tamer.psd (read-psd file.psd #:try-@2x? #false #:backing-scale 2.0))
   (cons (path->string (file-name-from-path file.psd))
         tamer.psd))
 
