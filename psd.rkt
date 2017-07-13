@@ -12,7 +12,7 @@
   #:transparent #:constructor-name use-read-psd-instead
   #:property prop:convertible
   (λ [[self : PSD] [request : Symbol] [default : Any]]
-    (convert (psd->bitmap self) request default)
+    (with-handlers ([exn? void]) (convert (psd->bitmap self) request default))
     #false))
 
 (define read-psd : (->* ((U Path-String Input-Port)) (#:backing-scale Positive-Real #:try-@2x? Boolean) PSD)
@@ -33,7 +33,7 @@
     (if (input-port? /dev/psdin)
         (let*-values ([(version channels height width depth color-mode) (read-psd-header /dev/psdin)]
                       [(_cmd _ir _lmi compression image-data) (read-psd-section /dev/psdin version)])
-          (psd-image-data->bitmap 'read-psd-as-bitmap image-data width height channels compression density))
+          (psd-image-data->bitmap 'read-psd-as-bitmap image-data color-mode width height channels depth compression density))
         (let-values ([(path scale) (select-psd-file /dev/psdin density try-@2x?)])
           (call-with-input-file* path (λ [[psdin : Input-Port]] (read-psd-as-bitmap psdin #:backing-scale scale)))))))
 
@@ -43,9 +43,10 @@
     (cond [(not (special-comment? maybe-bmp)) maybe-bmp]
           [else (let ([image-data : Bytes (assert (special-comment-value maybe-bmp) bytes?)])
                   (define bmp : (Instance Bitmap%)
-                    (psd-image-data->bitmap 'psd->bitmap image-data
-                                            (psd-header-width self) (psd-header-height self) (psd-header-channels self)
-                                            (psd-section-compression self) (psd-density self)))
+                    (psd-image-data->bitmap 'psd->bitmap image-data (psd-header-color-mode self)
+                                            (psd-header-width self) (psd-header-height self)
+                                            (psd-header-channels self) (psd-header-depth self)
+                                            (psd-section-compression-mode self) (psd-density self)))
                   (set-psd-section-image! self bmp)
                   bmp)])))
 

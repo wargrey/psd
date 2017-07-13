@@ -12,9 +12,7 @@
   (cons (path->string (file-name-from-path file.psd))
         tamer.psd))
 
-#|
-(for/list ([file.psd (in-directory "/Applications")] #:when (psd? file.psd))
+#;(for/list ([file.psd (in-directory "/Applications")] #:when (psd? file.psd))
   (printf "loading ~a~n" file.psd)
-  (define bitmap.psd (with-handlers ([exn? values]) (read-psd file.psd #:try-@2x? #true)))
-  (list file.psd (format "~a" bitmap.psd) bitmap.psd))
-|#
+  (define bitmap.psd (read-psd file.psd #:try-@2x? #true))
+  (cons file.psd bitmap.psd))

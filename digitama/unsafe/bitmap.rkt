@@ -7,8 +7,7 @@
 (require typed/racket/unsafe)
 
 (module unsafe racket/base
-  (provide (all-defined-out))
-  (provide (all-from-out file/convertible))
+  (provide (all-defined-out) prop:convertible convert)
   
   (require racket/draw/unsafe/cairo)
   (require racket/unsafe/ops)

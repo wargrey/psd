@@ -16,14 +16,14 @@
    [width : Positive-Index]
    [height : Positive-Index]
    [depth : Positive-Byte]
-   [color : PSD-Color-Mode])
+   [color-mode : PSD-Color-Mode])
   #:transparent)
 
 (struct psd-section psd-header
   ([color-data : Special-Comment]
    [resources : Special-Comment]
    [layers : Special-Comment]
-   [compression : PSD-Compression-Mode]
+   [compression-mode : PSD-Compression-Mode]
    [image : (U (Instance Bitmap%) Special-Comment)])
   #:transparent #:mutable)
 
@@ -57,7 +57,7 @@
     (unless (and (equal? signature #"8BPS") (or (= version 1) (= version 2)))
       (raise-user-error 'read-psd-header "this is not a valid PSD/PSB file: ~a" (object-name /dev/psdin)))
     
-    (read-nbytes* /dev/psdin 6)                          ; reserved
+    (read-nbytes* /dev/psdin 6) ; reserved
     (values version
             (read-integer /dev/psdin 2 #false positive-byte?)   ; channels
             (read-integer /dev/psdin 4 #false positive-index?)  ; height
@@ -74,10 +74,12 @@
             (port->bytes /dev/psdin))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define psd-image-data->bitmap : (-> Symbol Bytes Positive-Index Positive-Index Positive-Byte
+(define psd-image-data->bitmap : (-> Symbol Bytes PSD-Color-Mode Positive-Index Positive-Index Positive-Byte Positive-Byte
                                      PSD-Compression-Mode Positive-Real (Instance Bitmap%))
-  (lambda [func planar-data width height channels compression density]
-    (unless (or (fx= channels 3) (fx= channels 4)) (throw-unsupported-error func "inproper channel count: ~a" channels))
+  (lambda [func planar-data color-mode width height channels depth compression density]
+    (unless (eq? color-mode 'RGB) (throw-unsupported-error func "unimplemeneted color mode: ~a" color-mode))
+    (unless (fx= depth 8) (throw-unsupported-error func "unimplemeneted depth : ~a-bpc" depth))
+    (unless (or (fx= channels 3) (fx= channels 4)) (throw-unsupported-error func "unimplemented channel count: ~a" channels))
     (case compression
       [(Raw) (planar-data->bitmap planar-data width height channels density)]
       [(RLE) (let* ([data-index (assert (fx* (fx* height channels) 2) index?)]
