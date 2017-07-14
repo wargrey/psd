@@ -4,6 +4,7 @@
 
 (require "draw.rkt")
 (require "resource.rkt")
+(require "layer.rkt")
 (require "misc.rkt")
 
 (require (for-syntax racket/base))
@@ -21,6 +22,8 @@
   ([color-data : Special-Comment]
    [resources : (U PSD-Image-Resources Special-Comment)]
    [layers : Special-Comment]
+   [global-mask : (U PSD-Global-Mask Special-Comment False)]
+   [tagged-blocks : Special-Comment]
    [compression-mode : PSD-Compression-Mode]
    [image : (U (Instance Bitmap%) Special-Comment)])
   #:transparent #:mutable)

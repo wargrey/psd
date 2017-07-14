@@ -9,6 +9,7 @@
 (require "digitama/stdin.rkt")
 (require "digitama/bitmap.rkt")
 (require "digitama/parser.rkt")
+(require "digitama/layer.rkt")
 (require "digitama/resources/format.rkt")
 (require "digitama/unsafe/resource.rkt")
 (require "digitama/misc.rkt")
@@ -27,11 +28,13 @@
   (lambda [/dev/psdin #:backing-scale [density 1.0] #:try-@2x? [try-@2x? #false]]
     (if (input-port? /dev/psdin)
         (let*-values ([(version channels height width depth color-mode) (read-psd-header /dev/psdin)]
-                      [(color-mode-data image-resources layer+mask compression-mode image-data) (read-psd-section /dev/psdin version)])
+                      [(color-mode-data image-resources layer-info mask-info tagged-blocks) (read-psd-subsection /dev/psdin version)]
+                      [(compression-mode image-data) (read-psd-composite-image /dev/psdin)])
           (use-read-psd-instead (integer->version version) channels width height depth color-mode 
-                                (make-special-comment color-mode-data)
-                                (make-special-comment image-resources)
-                                (make-special-comment layer+mask)
+                                (make-special-comment color-mode-data) (make-special-comment image-resources)
+                                (make-special-comment layer-info)
+                                (and mask-info (make-special-comment mask-info))
+                                (make-special-comment tagged-blocks)
                                 compression-mode (make-special-comment image-data) density))
         (let-values ([(path scale) (select-psd-file /dev/psdin density try-@2x?)])
           (call-with-input-file* path (λ [[psdin : Input-Port]] (read-psd psdin #:backing-scale scale)))))))
@@ -47,16 +50,53 @@
                 (let parse-8BIM : PSD-Image-Resources ([start : Integer 0]
                                                        [blocks : (Listof (Pairof Integer PSD-Resource-Block)) null])
                   (cond [(and (regexp-match? #px"^8BIM" resource-data start) (index? start))
-                         (define id : Integer (parse-integer resource-data 2 #false (fx+ start 4)))
+                         (define id : Integer (parse-int16 resource-data (fx+ start 4)))
                          (define-values (pascal psize) (parse-pascal-string resource-data (fx+ start 6)))
                          (define size-start : Integer (fx+ (fx+ start 8) (fx+ psize (fxremainder psize 2))))
-                         (define data-size : Integer (parse-integer resource-data 4 #false size-start))
+                         (define data-size : Integer (parse-size resource-data size-start 4))
                          (define data-start : Integer (fx+ size-start 4))
-                         (define raw : Bytes (parse-nbytes resource-data data-size data-start))
+                         (define raw : Bytes (parse-nbytes resource-data data-start data-size))
                          (parse-8BIM (fx+ (fx+ data-start data-size) (fxremainder data-size 2))
                                      (cons (cons id (cons pascal (make-special-comment raw))) blocks))]
                         [(null? blocks) psd-empty-resources]
                         [else (make-hasheq blocks)]))))))
+
+(define psd-global-layer-mask : (-> PSD (Option PSD-Global-Mask))
+  (lambda [self]
+    (psd-ref! self section-global-mask
+              (λ [mask-info]
+                (psd-global-mask (parse-int16 mask-info 0)
+                                 (list (parse-uint16 mask-info 2)
+                                       (parse-uint16 mask-info 4)
+                                       (parse-uint16 mask-info 6)
+                                       (parse-uint16 mask-info 8))
+                                 (integer->mask-opacity (parse-int16 mask-info 10 index?))
+                                 (integer->mask-kind (parse-uint8 mask-info 12)))))))
+
+(define psd->bitmap : (-> PSD (Instance Bitmap%))
+  (lambda [self]
+    (psd-ref! self section-image
+              (λ [image-data]
+                (psd-image-data->bitmap 'psd->bitmap image-data (psd-header-color-mode self)
+                                        (psd-header-width self) (psd-header-height self)
+                                        (psd-header-channels self) (psd-header-depth self)
+                                        (psd-section-compression-mode self) (psd-density self))))))
+
+(define psd->thumbnail : (-> PSD (Option (Instance Bitmap%)))
+  (lambda [self]
+    (define maybe-preview : (Option PSD-Thumbnail) (psd-thumbnail self))
+    (and maybe-preview (psd-thumbnail-image maybe-preview))))
+
+(define psd-size : (-> PSD (Values Positive-Index Positive-Index))
+  (lambda [self]
+    (define density : Positive-Real (psd-density self))
+    (values (~size (psd-header-width self) density)
+            (~size (psd-header-height self) density))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define psd-grid+guides : (-> PSD (Option PSD-Grid+Guides)) (λ [self] (psd-assert (psd-resource-ref self #x408) psd-grid+guides?)))
+(define psd-thumbnail : (-> PSD (Option PSD-Thumbnail)) (λ [self] (psd-assert (psd-resource-ref self #x40C) psd-thumbnail?)))
+(define psd-file-info : (-> PSD (Option PSD-File-Info)) (λ [self] (psd-assert (psd-resource-ref self #x424) psd-file-info?)))
 
 (define psd-resource-ref : (-> PSD Integer (Option PSD-Resource))
   ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_38034
@@ -84,31 +124,6 @@
     (for ([id (in-list (if (null? ids) (hash-keys (psd-resources self)) ids))])
       (with-handlers ([exn? void])
         (psd-resource-ref self id)))))
-
-(define psd->bitmap : (-> PSD (Instance Bitmap%))
-  (lambda [self]
-    (psd-ref! self section-image
-              (λ [image-data]
-                (psd-image-data->bitmap 'psd->bitmap image-data (psd-header-color-mode self)
-                                        (psd-header-width self) (psd-header-height self)
-                                        (psd-header-channels self) (psd-header-depth self)
-                                        (psd-section-compression-mode self) (psd-density self))))))
-
-(define psd->thumbnail : (-> PSD (Option (Instance Bitmap%)))
-  (lambda [self]
-    (define maybe-preview : (Option PSD-Thumbnail) (psd-thumbnail self))
-    (and maybe-preview (psd-thumbnail-image maybe-preview))))
-
-(define psd-size : (-> PSD (Values Positive-Index Positive-Index))
-  (lambda [self]
-    (define density : Positive-Real (psd-density self))
-    (values (~size (psd-header-width self) density)
-            (~size (psd-header-height self) density))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define psd-grid+guides : (-> PSD (Option PSD-Grid+Guides)) (λ [self] (psd-assert (psd-resource-ref self #x408) psd-grid+guides?)))
-(define psd-thumbnail : (-> PSD (Option PSD-Thumbnail)) (λ [self] (psd-assert (psd-resource-ref self #x40C) psd-thumbnail?)))
-(define psd-file-info : (-> PSD (Option PSD-File-Info)) (λ [self] (psd-assert (psd-resource-ref self #x424) psd-file-info?)))
 
 #;(define psd-profile : (->* () (Output-Port) Void)
   (lambda [[out (current-output-port)]]

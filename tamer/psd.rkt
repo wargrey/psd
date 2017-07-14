@@ -11,6 +11,7 @@
   (define tamer.psd (read-psd file.psd #:try-@2x? #false #:backing-scale 2.0))
   (psd-resolve-resources tamer.psd)
   (list (path->string (file-name-from-path file.psd))
+        (psd-global-layer-mask tamer.psd)
         tamer.psd
         (psd-resources tamer.psd)))
 

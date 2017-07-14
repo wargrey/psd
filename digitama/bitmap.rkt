@@ -17,7 +17,7 @@
     (case compression
       [(Raw) (planar-data->bitmap planar-data width height channels density)]
       [(RLE) (let* ([scan-lines (fx* height channels)]
-                    [intervals (nbytes-pairs (parse-nsizes-list planar-data scan-lines 2 0) (fx* scan-lines 2))])
+                    [intervals (nbytes-pairs (fx* scan-lines 2) (parse-nsizes-list planar-data 0 2 scan-lines))])
                (planar-data->bitmap (for/list : (Listof Bytes) ([interval (in-list intervals)])
                                       (unpackbits width planar-data (car interval) (cdr interval)))
                                     width height channels density))]

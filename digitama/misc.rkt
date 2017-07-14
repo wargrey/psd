@@ -30,21 +30,10 @@
 
 (define-syntax (define-enumeration* stx)
   (syntax-parse stx
-    [(_ id #:as TypeU kw-filter #:-> [args Args] ... Type [(enum) sexp ...] ... [#:else defsexp ...])
-     #'(begin (define-enumeration id : TypeU [enum ...])
-              (define (kw-filter [kw : Symbol] [args : Args] ...) : Type
-                (case kw [(enum) sexp ...] ... [else defsexp ...])))]
-    [(_ id #:as TypeU kw-filter #:-> [args Args] ... Type [(enum) sexp ...] ...)
-     #'(begin (define-enumeration id : TypeU [enum ...])
-              (define kw-filter : (case-> [TypeU Args ... -> Type] [Symbol Args ... -> (Option Type)])
-                (lambda [kw args ...] (case kw [(enum) sexp ...] ... [else #false]))))]
     [(_ id #:+> TypeU kw->enum enum->kw #:-> Type [enum value] ... [enum$ value$])
-     (with-syntax ([(range ...) (for/list ([<start> (in-syntax #'(value ...))]
-                                           [<end> (sequence-tail (in-syntax #'(value ... value$)) 1)])
-                                  (datum->syntax <start> (/ (+ (syntax-e <start>) (syntax-e <end>)) 2)))])
-       #'(begin (define-enumeration id : TypeU #:with kw->enum #:-> Type [enum value] ... [enum$ value$])
-                (define (enum->kw [kv : Type]) : TypeU
-                  (cond [(< kv range) 'enum] ... [else 'enum$]))))]
+     #'(begin (define-enumeration id : TypeU #:with kw->enum #:-> Type [enum value] ... [enum$ value$])
+              (define (enum->kw [kv : Type]) : TypeU
+                (cond [(= kv value) 'enum] ... [else 'enum$])))]
     [(_ id #:+> TypeU kw->enum enum->kw [start:integer enum ... enum$])
      (with-syntax ([(value ... value$) (for/list ([<enum> (in-syntax #'(enum ... enum$))]
                                                   [idx (in-naturals 0)])

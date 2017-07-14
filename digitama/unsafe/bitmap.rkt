@@ -23,30 +23,27 @@
     (when (unsafe-fx= channels 3) (bytes-fill! pixels #xFF))
     (if (bytes? planar-data)
         (case channels
-          [(3) (fill-rgba-from-rgba! pixels planar-data width height stride #false)]
-          [(4) (fill-rgba-from-rgba! pixels planar-data width height stride #true)])
+          [(3) (fill-argb-from-rgba! pixels planar-data width height stride fill-rgb!)]
+          [(4) (fill-argb-from-rgba! pixels planar-data width height stride fill-argb!)])
         (case channels
-          [(3) (fill-rgba-from-rgba*! pixels planar-data width height stride channels)]
-          [(4) (fill-rgba-from-rgba*! pixels planar-data width height stride channels)]))
+          [(3) (fill-argb-from-rgba*! pixels planar-data width height stride channels)]
+          [(4) (fill-argb-from-rgba*! pixels planar-data width height stride channels)]))
     (cairo_surface_mark_dirty surface)
     bmp)
 
   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   (define-values (A R G B) (if (system-big-endian?) (values 0 1 2 3) (values 3 2 1 0)))
 
-  (define (fill-rgba-from-rgba! pixels source width height stride alpha?)
+  (define (fill-argb-from-rgba! pixels source width height stride fill-pixel!)
     (define total (unsafe-fx* width height))
-    (let fill! ([idx 0])
-      (when (unsafe-fx< idx total)
-        (define-values (row col) (values (unsafe-fxquotient idx width) (unsafe-fxremainder idx width)))
-        (define dest-idx (unsafe-fx+ (unsafe-fx* row stride) (unsafe-fx* col 4)))
-        (unsafe-bytes-set! pixels (unsafe-fx+ dest-idx R) (unsafe-bytes-ref source (unsafe-fx+ idx (unsafe-fx* total 0))))
-        (unsafe-bytes-set! pixels (unsafe-fx+ dest-idx G) (unsafe-bytes-ref source (unsafe-fx+ idx (unsafe-fx* total 1))))
-        (unsafe-bytes-set! pixels (unsafe-fx+ dest-idx B) (unsafe-bytes-ref source (unsafe-fx+ idx (unsafe-fx* total 2))))
-        (when alpha? (unsafe-bytes-set! pixels (unsafe-fx+ dest-idx A) (unsafe-bytes-ref source (unsafe-fx+ idx (unsafe-fx* total 3)))))
-        (fill! (unsafe-fx+ idx 1)))))
+    (let fill! ([src-idx 0])
+      (when (unsafe-fx< src-idx total)
+        (define row (unsafe-fxquotient src-idx width))
+        (define col (unsafe-fxremainder src-idx width))
+        (fill-pixel! pixels (unsafe-fx+ (unsafe-fx* row stride) (unsafe-fx* col 4)) source src-idx total)
+        (fill! (unsafe-fx+ src-idx 1)))))
 
-  (define (fill-rgba-from-rgba*! pixels sources width height stride channels)
+  (define (fill-argb-from-rgba*! pixels sources width height stride channels)
     (let fill! ([rest sources] [row 0] [channel-idx 0])
       (when (unsafe-fx< channel-idx channels)
         (define channel (case channel-idx [(0) R] [(1) G] [(2) B] [else A]))
@@ -71,7 +68,16 @@
       (raise-arguments-error 'planar-data->bitmap "image is too big"
                              "width" width "height" height
                              "density" density))
-    (values img surface)))
+    (values img surface))
+
+  (define (fill-rgb! pixels dest-idx source src-idx total)
+    (unsafe-bytes-set! pixels (unsafe-fx+ dest-idx R) (unsafe-bytes-ref source (unsafe-fx+ src-idx (unsafe-fx* total 0))))
+    (unsafe-bytes-set! pixels (unsafe-fx+ dest-idx G) (unsafe-bytes-ref source (unsafe-fx+ src-idx (unsafe-fx* total 1))))
+    (unsafe-bytes-set! pixels (unsafe-fx+ dest-idx B) (unsafe-bytes-ref source (unsafe-fx+ src-idx (unsafe-fx* total 2)))))
+  
+  (define (fill-argb! pixels dest-idx source src-idx total)
+    (fill-rgb! pixels dest-idx source src-idx total)
+    (unsafe-bytes-set! pixels (unsafe-fx+ dest-idx A) (unsafe-bytes-ref source (unsafe-fx+ src-idx (unsafe-fx* total 3))))))
 
 (unsafe-require/typed
  (submod "." unsafe)

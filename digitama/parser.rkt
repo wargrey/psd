@@ -3,6 +3,7 @@
 ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml
 
 (provide (all-defined-out))
+(provide (rename-out [bytes-ref parse-uint8]))
 
 (require racket/fixnum)
 
@@ -13,38 +14,62 @@
     (values (bytes->string/utf-8 src #false bstart (fx+ bstart size))
             size)))
 
-(define parse-integer : (All (a) (case-> [Bytes Integer -> Byte]
-                                         [Bytes Integer Boolean Integer -> Integer]
-                                         [Bytes Integer Boolean (-> Any Boolean : a) Integer -> a]))
+(define parse-int16 : (All (a) (case-> [Bytes Integer -> Integer]
+                                       [Bytes Integer (-> Any Boolean : a) -> a]))
   (case-lambda
-    [(src start) (bytes-ref src start)]
-    [(src size signed? subinteger? start)
-     (assert (parse-integer src size signed? start) subinteger?)]
-    [(src size signed? start)
-     (define end : Fixnum (fx+ start size))
-     (integer-bytes->integer src signed? #true start end)]))
+    [(src start) (integer-bytes->integer src #true #true start (fx+ start 2))]
+    [(src start subinteger?) (assert (parse-int16 src start) subinteger?)]))
+
+(define parse-uint16 : (All (a) (case-> [Bytes Integer -> Index]
+                                        [Bytes Integer (-> Any Boolean : a) -> a]))
+  (case-lambda
+    [(src start) (parse-size src start 2)]
+    [(src start subinteger?) (parse-size src start 2 subinteger?)]))
+
+(define parse-int32 : (All (a) (case-> [Bytes Integer -> Integer]
+                                         [Bytes Integer (-> Any Boolean : a) -> a]))
+  (case-lambda
+    [(src start) (integer-bytes->integer src #true #true start (fx+ start 4))]
+    [(src start subinteger?) (assert (parse-int32 src start) subinteger?)]))
+
+(define parse-uint32 : (All (a) (case-> [Bytes Integer -> Natural]
+                                          [Bytes Integer (-> Any Boolean : a) -> a]))
+  (case-lambda
+    [(src start) (parse-size src start 4)]
+    [(src start subinteger?) (parse-size src start 4 subinteger?)]))
+
+(define parse-int64 : (All (a) (case-> [Bytes Integer -> Integer]
+                                      [Bytes Integer (-> Any Boolean : a) -> a]))
+  (case-lambda
+    [(src start) (integer-bytes->integer src #true #true start (fx+ start 8))]
+    [(src start subinteger?) (assert (parse-int64 src start) subinteger?)]))
+
+(define parse-size : (All (a) (case-> [Bytes Integer Integer -> Index]
+                                        [Bytes Integer Integer (-> Any Boolean : a) -> a]))
+  (case-lambda
+    [(src start size) (parse-size src start size index?)]
+    [(src start size size?) (assert (integer-bytes->integer src #false #true start (fx+ start size)) size?)]))
 
 (define parse-nsizes-list : (-> Bytes Integer Integer Integer (Listof Index))
-  (lambda [src count size start]
+  (lambda [src start size count]
     (let parse ([idx : Fixnum (fx+ (fx* (fx- count 1) size) start)]
                 [dest : (Listof Index) null])
-      (cond [(not (index? idx)) dest]
-            [else (let ([n (parse-integer src size #false index? idx)])
+      (cond [(fx< idx start) dest]
+            [else (let ([n (parse-size src idx size)])
                     (parse (fx- idx size) (cons n dest)))]))))
 
-(define parse-double-flonum : (-> Bytes Integer Flonum)
+(define parse-double : (-> Bytes Integer Flonum)
   (lambda [src start]
     (with-asserts ([start index?])
-      (define end : Positive-Fixnum (fx+ start 8))
-      (floating-point-bytes->real src #true start end))))
+      (floating-point-bytes->real src #true start (fx+ start 8)))))
 
 (define parse-nbytes : (-> Bytes Integer Integer Bytes)
-  (lambda [src bsize start]
+  (lambda [src start bsize]
     (subbytes src start (fx+ start bsize))))
 
-(define parse-nbytes-list : (-> Bytes (Listof Index) Integer (Listof Bytes))
-  (lambda [src bsizes start]
-    (for/list : (Listof Bytes) ([interval (in-list (nbytes-pairs bsizes start))])
+(define parse-nbytes-list : (-> Bytes Integer (Listof Index) (Listof Bytes))
+  (lambda [src start bsizes]
+    (for/list : (Listof Bytes) ([interval (in-list (nbytes-pairs start bsizes))])
       (subbytes src (car interval) (cdr interval)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -63,8 +88,8 @@
     (let ([b (arithmetic-shift 1 bp)])
       (= (bitwise-and flg b) b))))
 
-(define nbytes-pairs : (-> (Listof Index) Integer (Listof (Pairof Integer Integer)))
-  (lambda [bsizes start]
+(define nbytes-pairs : (-> Integer (Listof Index) (Listof (Pairof Integer Integer)))
+  (lambda [start bsizes]
     (let parse ([last-end : Integer start]
                 [sizes : (Listof Index) bsizes]
                 [dest : (Listof (Pairof Integer Integer)) null])
