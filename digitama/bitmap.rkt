@@ -22,9 +22,3 @@
                                       (unpackbits width planar-data (car interval) (cdr interval)))
                                     width height channels density))]
       [else (throw-unsupported-error func "unimplemented compression method: ~a" compression)])))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define throw-unsupported-error : (-> Symbol String Any * Nothing)
-  (lambda [func fmt . args]
-    (raise (make-exn:fail:unsupported (apply format (string-append "~a: " fmt) func args)
-                                      (continuation-marks #false)))))

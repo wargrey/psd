@@ -12,9 +12,8 @@
 
 (struct: psd-resource : PSD-Resource
   ([id : Integer]
-   [name : String])
-  #:transparent)
+   [name : String]))
 
-(define psd-resource-assert : (All (a) (-> Any (-> Any Boolean : a) (Option a)))
+(define psd-assert : (All (a) (-> Any (-> Any Boolean : a) (Option a)))
   (lambda [v psd-resource?]
     (and v (assert v psd-resource?))))

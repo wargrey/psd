@@ -54,3 +54,8 @@
   (lambda [v]
     (cond [(not (special-comment? v)) v]
           [else (assert (special-comment-value v) bytes?)])))
+
+(define throw-unsupported-error : (-> Symbol String Any * Nothing)
+  (lambda [func fmt . args]
+    (raise (make-exn:fail:unsupported (apply format (string-append "~a: " fmt) func args)
+                                      (continuation-marks #false)))))

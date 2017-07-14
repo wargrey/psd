@@ -14,14 +14,14 @@
 (require "digitama/misc.rkt")
 
 (struct: psd : PSD psd-section ([density : Positive-Real])
-  #:transparent #:constructor-name use-read-psd-instead
+  #:constructor-name use-read-psd-instead
   #:property prop:convertible
   (λ [[self : PSD] [request : Symbol] [default : Any]]
-    (define bmp : (Option (Instance Bitmap%))
+    (define maybe-bmp : (Option (Instance Bitmap%))
       (with-handlers ([exn? (λ [[e : exn]] (psd->thumbnail self))])
         (psd->bitmap self)))
-    (cond [(not bmp) default]
-          [else (convert bmp request default)])))
+    (cond [(not maybe-bmp) default]
+          [else (convert maybe-bmp request default)])))
 
 (define read-psd : (->* ((U Path-String Input-Port)) (#:backing-scale Positive-Real #:try-@2x? Boolean) PSD)
   (lambda [/dev/psdin #:backing-scale [density 1.0] #:try-@2x? [try-@2x? #false]]
@@ -38,12 +38,7 @@
 
 (define read-psd-as-bitmap : (->* ((U Path-String Input-Port)) (#:backing-scale Positive-Real #:try-@2x? Boolean) (Instance Bitmap%))
   (lambda [/dev/psdin #:backing-scale [density 1.0] #:try-@2x? [try-@2x? #false]]
-    (if (input-port? /dev/psdin)
-        (let*-values ([(version channels height width depth color-mode) (read-psd-header /dev/psdin)]
-                      [(_cmd _ir _lmi compression image-data) (read-psd-section /dev/psdin version)])
-          (psd-image-data->bitmap 'read-psd-as-bitmap image-data color-mode width height channels depth compression density))
-        (let-values ([(path scale) (select-psd-file /dev/psdin density try-@2x?)])
-          (call-with-input-file* path (λ [[psdin : Input-Port]] (read-psd-as-bitmap psdin #:backing-scale scale)))))))
+    (psd->bitmap (read-psd /dev/psdin #:backing-scale density #:try-@2x? try-@2x?))))
 
 (define psd-resources : (-> PSD PSD-Image-Resources)
   (lambda [self]
@@ -70,22 +65,25 @@
     (define maybe-res (hash-ref resources id void))
     (or (and (psd-resource? maybe-res) maybe-res)
         (and (pair? maybe-res)
-             (let ([res.rkt (collection-file-path (format "0x~x.rkt" id) "psd" "digitama" "resources")])
-               (define make-resource (with-handlers ([exn? void]) (dynamic-require res.rkt 'make-resource)))
-               (and (psd-resource-constructor? make-resource)
-                    (let ([block (psd-unbox (cdr maybe-res))]
-                          [name (car maybe-res)])
-                      (define res : PSD-Resource
-                        (case id
-                          [(#x40C) (make-resource id block name (list (psd-density self)))]
-                          [else (make-resource id block name null)]))
-                      (hash-set! resources id res)
-                      res)))))))
+             (let ([res.rkt (collection-file-path (format "id~a.rkt" id) "psd" "digitama" "resources")]
+                   [main (string->symbol (format "0x~x" id))])
+               (define make-resource (with-handlers ([exn? void]) (dynamic-require res.rkt main)))
+               (if (psd-resource-constructor? make-resource)
+                   (let ([block (psd-unbox (cdr maybe-res))]
+                         [name (car maybe-res)])
+                     (define res : PSD-Resource
+                       (case id
+                         [(#x40C) (make-resource id block name (list (psd-density self)))]
+                         [else (make-resource id block name null)]))
+                     (hash-set! resources id res)
+                     res)
+                   (throw-unsupported-error 'psd-resource-ref "unimplemeneted resource: 0x~X" id)))))))
 
-(define psd-thumbnail : (-> PSD (Option PSD-Thumbnail))
-  (lambda [self]
-    (psd-resource-assert (psd-resource-ref self #x40C)
-                         psd-thumbnail?)))
+(define psd-resolve-resources : (->* (PSD) ((Listof Integer)) Void)
+  (lambda [self [ids null]]
+    (for ([id (in-list (if (null? ids) (hash-keys (psd-resources self)) ids))])
+      (with-handlers ([exn? void])
+        (psd-resource-ref self id)))))
 
 (define psd->bitmap : (-> PSD (Instance Bitmap%))
   (lambda [self]
@@ -106,6 +104,11 @@
     (define density : Positive-Real (psd-density self))
     (values (~size (psd-header-width self) density)
             (~size (psd-header-height self) density))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define psd-grid+guides : (-> PSD (Option PSD-Grid+Guides)) (λ [self] (psd-assert (psd-resource-ref self #x408) psd-grid+guides?)))
+(define psd-thumbnail : (-> PSD (Option PSD-Thumbnail)) (λ [self] (psd-assert (psd-resource-ref self #x40C) psd-thumbnail?)))
+(define psd-file-info : (-> PSD (Option PSD-File-Info)) (λ [self] (psd-assert (psd-resource-ref self #x424) psd-file-info?)))
 
 #;(define psd-profile : (->* () (Output-Port) Void)
   (lambda [[out (current-output-port)]]

@@ -13,14 +13,16 @@
     (values (bytes->string/utf-8 src #false bstart (fx+ bstart size))
             size)))
 
-(define parse-integer : (All (a) (case-> [Bytes Integer Boolean Integer -> Integer]
+(define parse-integer : (All (a) (case-> [Bytes Integer -> Byte]
+                                         [Bytes Integer Boolean Integer -> Integer]
                                          [Bytes Integer Boolean (-> Any Boolean : a) Integer -> a]))
   (case-lambda
+    [(src start) (bytes-ref src start)]
+    [(src size signed? subinteger? start)
+     (assert (parse-integer src size signed? start) subinteger?)]
     [(src size signed? start)
      (define end : Fixnum (fx+ start size))
-     (integer-bytes->integer src signed? #true start end)]
-    [(src size signed? subinteger? start)
-     (assert (parse-integer src size signed? start) subinteger?)]))
+     (integer-bytes->integer src signed? #true start end)]))
 
 (define parse-nsizes-list : (-> Bytes Integer Integer Integer (Listof Index))
   (lambda [src count size start]

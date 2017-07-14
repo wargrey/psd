@@ -238,26 +238,6 @@
     
     (define-values {layer-images} (vector-map {lambda [psd-layer] (mcons (send psd-layer get-name) (void))} layers))
     
-    (define/public {get-xmp}
-      (mcdr (hash-ref image-resources #x424)))
-    
-    (define/public {get-grid-guides}
-      (define d1032 (hash-ref image-resources #x408))
-      (when (bytes? (mcdr d1032))
-        (set-mcdr! d1032 (with-input-from-bytes (mcdr d1032)
-                           {thunk (make-hash (list (cons 'version (read-int 4))
-                                                   (cons 'horizotal (read-int 4))
-                                                   (cons 'vertical (read-int 4))
-                                                   (cons 'fguides (build-list (read-int 4)
-                                                                              {lambda [whocares] (read-ints '{4 1})}))))})))
-      (mcdr d1032))
-    
-    (define/public {get-thumbnail}
-      (define d1036 (hash-ref image-resources #x40C))
-      (when (bytes? (mcdr d1036))
-        (set-mcdr! d1036 (make-object bitmap% (open-input-bytes (subbytes (mcdr d1036) 28)))))
-      (mcdr d1036))
-    
     (define/public {get-images-by-layers layer-names}
       (define names (if (list? layer-names) (map ~a layer-names) (list (~a layer-names))))
       (filter-not void?
