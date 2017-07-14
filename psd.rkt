@@ -14,6 +14,10 @@
 (require "digitama/unsafe/resource.rkt")
 (require "digitama/misc.rkt")
 
+
+(define psd-remove-broken-resource? : (Parameterof Boolean) (make-parameter #false))
+(define psd-remove-unknown-resource? : (Parameterof Boolean) (make-parameter #true))
+
 (struct: psd : PSD psd-section ([density : Positive-Real])
   #:constructor-name use-read-psd-instead
   #:property prop:convertible
@@ -108,16 +112,19 @@
              (let ([res.rkt (collection-file-path (format "id~a.rkt" id) "psd" "digitama" "resources")]
                    [main (string->symbol (format "0x~x" id))])
                (define make-resource (with-handlers ([exn? void]) (dynamic-require res.rkt main)))
-               (if (psd-resource-constructor? make-resource)
-                   (let ([block (psd-unbox (cdr maybe-res))]
-                         [name (car maybe-res)])
-                     (define res : PSD-Resource
-                       (case id
-                         [(#x40C) (make-resource id block name (list (psd-density self)))]
-                         [else (make-resource id block name null)]))
-                     (hash-set! resources id res)
-                     res)
-                   (throw-unsupported-error 'psd-resource-ref "unimplemeneted resource: 0x~X" id)))))))
+               (cond [(psd-resource-constructor? make-resource)
+                      (let ([block (psd-unbox (cdr maybe-res))]
+                            [name (car maybe-res)])
+                        (define res : (Option PSD-Resource)
+                          (with-handlers ([exn:fail? psd-warn-broken-resource])
+                            (case id
+                              [(#x40C) (make-resource id block name (list (psd-density self)))]
+                              [else (make-resource id block name null)])))
+                        (cond [(psd-resource? res) (hash-set! resources id res)]
+                              [(psd-remove-broken-resource?) (hash-remove! resources id)])
+                        res)]
+                     [(psd-remove-unknown-resource?) (hash-remove! resources id) #false]
+                     [else (throw-unsupported-error 'psd-resource-ref "unimplemeneted resource: 0x~X" id)]))))))
 
 (define psd-resolve-resources : (->* (PSD) ((Listof Integer)) Void)
   (lambda [self [ids null]]

@@ -7,6 +7,9 @@
 (define-runtime-path tamer/ "./samples")
 (define (psd? path) (regexp-match? #px"[^@][^2][^x][.]psd$" path))
 
+(psd-remove-broken-resource? #true)
+(psd-remove-unknown-resource? #false)
+
 (for/list ([file.psd (in-directory tamer/)] #:when (psd? file.psd))
   (define tamer.psd (read-psd file.psd #:try-@2x? #false #:backing-scale 2.0))
   (psd-resolve-resources tamer.psd)

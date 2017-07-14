@@ -14,6 +14,12 @@
   ([id : Integer]
    [name : String]))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define psd-assert : (All (a) (-> Any (-> Any Boolean : a) (Option a)))
   (lambda [v psd-resource?]
     (and v (assert v psd-resource?))))
+
+(define psd-warn-broken-resource : (-> exn False)
+  (lambda [e]
+    (log-message (current-logger) 'warning 'exn:psd:resource (exn-message e) e)
+    #false))
