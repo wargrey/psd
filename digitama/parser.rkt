@@ -6,16 +6,23 @@
 
 (require racket/fixnum)
 
-(define parse-integer : (All (a) (case-> [Bytes Index Boolean Index -> Integer]
-                                         [Bytes Index Boolean (-> Any Boolean : a) Index -> a]))
+(define parse-pascal-string : (-> Bytes Integer (Values String Byte))
+  (lambda [src start]
+    (define size : Byte (bytes-ref src start))
+    (define bstart : Integer (fx+ start 1))
+    (values (bytes->string/utf-8 src #false bstart (fx+ bstart size))
+            size)))
+
+(define parse-integer : (All (a) (case-> [Bytes Integer Boolean Integer -> Integer]
+                                         [Bytes Integer Boolean (-> Any Boolean : a) Integer -> a]))
   (case-lambda
     [(src size signed? start)
-     (define end : Nonnegative-Fixnum (fx+ start size))
+     (define end : Fixnum (fx+ start size))
      (integer-bytes->integer src signed? #true start end)]
     [(src size signed? subinteger? start)
      (assert (parse-integer src size signed? start) subinteger?)]))
 
-(define parse-nsizes-list : (-> Bytes Index Index Index (Listof Index))
+(define parse-nsizes-list : (-> Bytes Integer Integer Integer (Listof Index))
   (lambda [src count size start]
     (let parse ([idx : Fixnum (fx+ (fx* (fx- count 1) size) start)]
                 [dest : (Listof Index) null])
@@ -23,16 +30,17 @@
             [else (let ([n (parse-integer src size #false index? idx)])
                     (parse (fx- idx size) (cons n dest)))]))))
 
-(define parse-double-flonum : (-> Bytes Index Flonum)
+(define parse-double-flonum : (-> Bytes Integer Flonum)
   (lambda [src start]
-    (define end : Nonnegative-Fixnum (fx+ start 8))
-    (floating-point-bytes->real src #true start end)))
+    (with-asserts ([start index?])
+      (define end : Positive-Fixnum (fx+ start 8))
+      (floating-point-bytes->real src #true start end))))
 
-(define parse-nbytes : (-> Bytes Index Index Bytes)
+(define parse-nbytes : (-> Bytes Integer Integer Bytes)
   (lambda [src bsize start]
     (subbytes src start (fx+ start bsize))))
 
-(define parse-nbytes-list : (-> Bytes (Listof Index) Index (Listof Bytes))
+(define parse-nbytes-list : (-> Bytes (Listof Index) Integer (Listof Bytes))
   (lambda [src bsizes start]
     (for/list : (Listof Bytes) ([interval (in-list (nbytes-pairs bsizes start))])
       (subbytes src (car interval) (cdr interval)))))
@@ -53,9 +61,9 @@
     (let ([b (arithmetic-shift 1 bp)])
       (= (bitwise-and flg b) b))))
 
-(define nbytes-pairs : (-> (Listof Index) Index (Listof (Pairof Integer Integer)))
+(define nbytes-pairs : (-> (Listof Index) Integer (Listof (Pairof Integer Integer)))
   (lambda [bsizes start]
-    (let parse ([last-end : Fixnum start]
+    (let parse ([last-end : Integer start]
                 [sizes : (Listof Index) bsizes]
                 [dest : (Listof (Pairof Integer Integer)) null])
       (cond [(null? sizes) (reverse dest)]

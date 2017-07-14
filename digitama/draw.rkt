@@ -2,9 +2,10 @@
 
 (provide (all-defined-out))
 (provide (all-from-out racket/fixnum))
-(provide Bitmap% prop:convertible convert)
+(provide make-object bitmap% Bitmap% prop:convertible convert)
 
-(require (only-in typed/racket/draw Bitmap%))
+(require (only-in typed/racket/draw Bitmap% bitmap%))
+(require (only-in racket/class make-object))
 (require typed/racket/unsafe)
 (require racket/fixnum)
 

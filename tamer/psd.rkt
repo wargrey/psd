@@ -9,8 +9,10 @@
 
 (for/list ([file.psd (in-directory tamer/)] #:when (psd? file.psd))
   (define tamer.psd (read-psd file.psd #:try-@2x? #false #:backing-scale 2.0))
-  (cons (path->string (file-name-from-path file.psd))
-        tamer.psd))
+  (list (path->string (file-name-from-path file.psd))
+        tamer.psd
+        (psd-resources tamer.psd)
+        (psd-thumbnail tamer.psd)))
 
 #;(for/list ([file.psd (in-directory "/Applications")] #:when (psd? file.psd))
   (printf "loading ~a~n" file.psd)

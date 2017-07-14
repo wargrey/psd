@@ -3,9 +3,10 @@
 (provide (all-defined-out))
 
 (require "draw.rkt")
+(require "resource.rkt")
 (require "misc.rkt")
 
-(define-type PSD-Image-Resources (Listof (Pairof Natural Any)))
+(require (for-syntax racket/base))
 
 (struct psd-header
   ([version : PSD-Version]
@@ -36,3 +37,20 @@
 (define-enumeration* psd-compression-mode #:+> PSD-Compression-Mode ; order matters
   compression-mode->integer integer->compression-mode
   [0 Raw RLE ZIP ZIP/prediction])
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define-syntax (psd-ref! stx)
+  (syntax-case stx [λ lambda]
+    [(_ self field (λ [maybe-val] make-val ...))
+     (with-syntax ([psd-field (datum->syntax #'field (string->symbol (format "psd-~a" (syntax-e #'field))))]
+                   [set-psd-field! (datum->syntax #'field (string->symbol (format "set-psd-~a!" (syntax-e #'field))))])
+       #'(let ([maybe-val (psd-unbox (psd-field self))])
+           (cond [(not (bytes? maybe-val)) maybe-val]
+                 [else (let ([tmp (let () make-val ...)]) (set-psd-field! self tmp) tmp)])))]
+    [(_ self field (lambda [maybe-val] make-val ...))
+     #'(psd-ref! self field (λ [maybe-val] make-val ...))]))
+
+(define psd-unbox : (All (a) (-> (U a Special-Comment) (U a Bytes)))
+  (lambda [v]
+    (cond [(not (special-comment? v)) v]
+          [else (assert (special-comment-value v) bytes?)])))
