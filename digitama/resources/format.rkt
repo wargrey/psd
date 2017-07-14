@@ -1,7 +1,7 @@
 #lang typed/racket/base
 
-(provide (all-defined-out))
-(provide (all-from-out "../resource.rkt"))
+(provide (all-defined-out) PSD-Resource)
+(provide (struct-out psd-resource))
 
 (require "../resource.rkt")
 (require "../draw.rkt")

@@ -11,15 +11,15 @@
 (define 0x408 : (-> Integer Bytes String Null PSD-Grid+Guides)
   (lambda [id block name argl]
     (psd-grid+guides id name
-                     (parse-uint32 block 0)
-                     (parse-uint32 block 4)
-                     (parse-uint32 block 8)
+                     (parse-uint32 block 0) ; version
+                     (parse-uint32 block 4) ; horizontal
+                     (parse-uint32 block 8) ; vertical
                      (let parse-guide ([fgridcount : Index (parse-size block 12 4)]
                                        [start : Integer 16]
                                        [guides : (Listof (Pairof Integer PSD-Guide-Direction)) null])
                        (cond [(fx= fgridcount 0) (reverse guides)]
                              [else (parse-guide (fx- fgridcount 1)
                                                 (fx+ start 5)
-                                                (cons (cons (parse-int32 block start)
+                                                (cons (cons (parse-int32 block start) ; location
                                                             (integer->vhselect (parse-uint8 block (fx+ start 4))))
                                                       guides))])))))

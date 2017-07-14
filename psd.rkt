@@ -10,16 +10,17 @@
 (require "digitama/bitmap.rkt")
 (require "digitama/parser.rkt")
 (require "digitama/layer.rkt")
-(require "digitama/resources/format.rkt")
-(require "digitama/unsafe/resource.rkt")
 (require "digitama/misc.rkt")
 
+(require "digitama/resource.rkt")
+(require "digitama/resources/format.rkt")
+(require "digitama/unsafe/resource.rkt")
 
 (define psd-remove-broken-resource? : (Parameterof Boolean) (make-parameter #false))
 (define psd-remove-unknown-resource? : (Parameterof Boolean) (make-parameter #true))
 
 (struct: psd : PSD psd-section ([density : Positive-Real])
-  #:constructor-name use-read-psd-instead
+  #:constructor-name make-psd/but-read-psd-should-be-used-instead
   #:property prop:convertible
   (λ [[self : PSD] [request : Symbol] [default : Any]]
     (define maybe-bmp : (Option (Instance Bitmap%))
@@ -34,12 +35,13 @@
         (let*-values ([(version channels height width depth color-mode) (read-psd-header /dev/psdin)]
                       [(color-mode-data image-resources layer-info mask-info tagged-blocks) (read-psd-subsection /dev/psdin version)]
                       [(compression-mode image-data) (read-psd-composite-image /dev/psdin)])
-          (use-read-psd-instead (integer->version version) channels width height depth color-mode 
-                                (make-special-comment color-mode-data) (make-special-comment image-resources)
-                                (make-special-comment layer-info)
-                                (and mask-info (make-special-comment mask-info))
-                                (make-special-comment tagged-blocks)
-                                compression-mode (make-special-comment image-data) density))
+          (make-psd/but-read-psd-should-be-used-instead
+           (integer->version version) channels width height depth color-mode 
+           (make-special-comment color-mode-data) (make-special-comment image-resources)
+           (make-special-comment layer-info)
+           (and mask-info (make-special-comment mask-info))
+           (make-special-comment tagged-blocks)
+           compression-mode (make-special-comment image-data) density))
         (let-values ([(path scale) (select-psd-file /dev/psdin density try-@2x?)])
           (call-with-input-file* path (λ [[psdin : Input-Port]] (read-psd psdin #:backing-scale scale)))))))
 
@@ -109,22 +111,23 @@
     (define maybe-res (hash-ref resources id void))
     (or (and (psd-resource? maybe-res) maybe-res)
         (and (pair? maybe-res)
-             (let ([res.rkt (collection-file-path (format "id~a.rkt" id) "psd" "digitama" "resources")]
-                   [main (string->symbol (format "0x~x" id))])
-               (define make-resource (with-handlers ([exn? void]) (dynamic-require res.rkt main)))
-               (cond [(psd-resource-constructor? make-resource)
-                      (let ([block (psd-unbox (cdr maybe-res))]
-                            [name (car maybe-res)])
-                        (define res : (Option PSD-Resource)
-                          (with-handlers ([exn:fail? psd-warn-broken-resource])
-                            (case id
-                              [(#x40C) (make-resource id block name (list (psd-density self)))]
-                              [else (make-resource id block name null)])))
-                        (cond [(psd-resource? res) (hash-set! resources id res)]
-                              [(psd-remove-broken-resource?) (hash-remove! resources id)])
-                        res)]
-                     [(psd-remove-unknown-resource?) (hash-remove! resources id) #false]
-                     [else (throw-unsupported-error 'psd-resource-ref "unimplemeneted resource: 0x~X" id)]))))))
+             (psd-parse-resource
+              id
+              (λ [[parse : PSD-Resource-Parser]]
+                (define-values (name block) (values (car maybe-res) (psd-unbox (cdr maybe-res))))
+                (define resource : (Option PSD-Resource)
+                  (with-handlers ([exn:fail? psd-warn-broken-resource])
+                    (case id
+                      [(#x040C) (parse id block name (list (psd-density self)))]
+                      [(#x03EF) (parse id block name (list (hash-has-key? resources #x0435)))]
+                      [else (parse id block name null)])))
+                (cond [(psd-resource? resource) (hash-set! resources id resource)]
+                      [(psd-remove-broken-resource?) (hash-remove! resources id)])
+                resource)
+              (λ []
+                (when (psd-remove-unknown-resource?)
+                  (hash-remove! resources id))
+                (throw-unsupported-error 'psd-resource-ref "unimplemeneted resource: 0x~X" id)))))))
 
 (define psd-resolve-resources : (->* (PSD) ((Listof Integer)) Void)
   (lambda [self [ids null]]
