@@ -7,7 +7,14 @@
 (require "../draw.rkt")
 (require "../misc.rkt")
 
-(struct: psd-thumbnail : PSD-Thumbnail psd-resource    ; 1036
+(struct: psd-version-info : PSD-Version-Info psd-resource ; 1057
+  ([version : Index]
+   [has-real-merged-data? : Boolean]
+   [writer : String]
+   [reader : String]
+   [file-version : Index]))
+
+(struct: psd-thumbnail : PSD-Thumbnail psd-resource ; 1036
   ([format : PSD-Thumbnail-Format]
    [width : Positive-Integer]
    [height : Positive-Integer]
@@ -18,7 +25,7 @@
    [planes : Index]
    [image : (Instance Bitmap%)]))
 
-(struct: psd-file-info : PSD-File-Info psd-resource     ; 1028 1060
+(struct: psd-file-info : PSD-File-Info psd-resource ; 1028 1060
   ([raw : Bytes]))
 
 (struct: psd-grid+guides : PSD-Grid+Guides psd-resource ; 1032

@@ -14,6 +14,22 @@
     (values (bytes->string/utf-8 src #false bstart (fx+ bstart size))
             size)))
 
+(define parse-unicode-string : (-> Bytes Integer (Values String Index))
+  (lambda [src start]
+    (define size : Index (parse-uint32 src start index?))
+    (cond [(fx= size 0) (values "" 0)]
+          [else (let ([buffer (make-string size #\null)]
+                      [max-idx (fx- size 1)])
+                  (let fill-string! ([src-idx : Integer (fx+ start 4)]
+                                     [dest-idx : Integer 0])
+                    (string-set! buffer dest-idx (parse-char src src-idx))
+                    (cond [(fx= dest-idx max-idx) (values buffer (assert (fx* size 2) index?))]
+                          [else (fill-string! (fx+ src-idx 2) (fx+ dest-idx 1))])))])))
+
+(define parse-char : (-> Bytes Integer Char)
+  (lambda [src start]
+    (integer->char (parse-uint16 src start))))
+
 (define parse-int16 : (All (a) (case-> [Bytes Integer -> Integer]
                                        [Bytes Integer (-> Any Boolean : a) -> a]))
   (case-lambda

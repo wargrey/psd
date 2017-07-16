@@ -41,3 +41,7 @@
        #'(begin (define-enumeration id : TypeU #:with kw->enum #:-> Integer [enum value] ... [enum$ value$])
                 (define (enum->kw [kv : Integer]) : TypeU
                   (cond [(= kv value) 'enum] ... [else 'enum$]))))]))
+
+(define psd-assert : (All (a) (-> Any (-> Any Boolean : a) (Option a)))
+  (lambda [v ?]
+    (and v (assert v ?))))

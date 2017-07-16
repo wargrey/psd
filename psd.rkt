@@ -11,6 +11,7 @@
 (require "digitama/parser.rkt")
 (require "digitama/layer.rkt")
 (require "digitama/misc.rkt")
+(require "digitama/exn.rkt")
 
 (require "digitama/resource.rkt")
 (require "digitama/resources/format.rkt")
@@ -24,8 +25,8 @@
   #:property prop:convertible
   (λ [[self : PSD] [request : Symbol] [default : Any]]
     (define maybe-bmp : (Option (Instance Bitmap%))
-      (with-handlers ([exn? (λ [[e : exn]] (psd->thumbnail self))])
-        (psd->bitmap self)))
+      (with-handlers ([exn? (λ [[e : exn]] (psd-thumbnail-bitmap self))])
+        (psd-composite-bitmap self)))
     (cond [(not maybe-bmp) default]
           [else (convert maybe-bmp request default)])))
 
@@ -47,8 +48,43 @@
 
 (define read-psd-as-bitmap : (->* ((U Path-String Input-Port)) (#:backing-scale Positive-Real #:try-@2x? Boolean) (Instance Bitmap%))
   (lambda [/dev/psdin #:backing-scale [density 1.0] #:try-@2x? [try-@2x? #false]]
-    (psd->bitmap (read-psd /dev/psdin #:backing-scale density #:try-@2x? try-@2x?))))
+    (psd-composite-bitmap (read-psd /dev/psdin #:backing-scale density #:try-@2x? try-@2x?))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define psd-large-document? : (-> PSD Boolean)
+  (lambda [self]
+    (eq? (psd-header-version self) 'PSB)))
+
+(define psd-size : (-> PSD (Values Positive-Index Positive-Index))
+  (lambda [self]
+    (define density : Positive-Real (psd-density self))
+    (values (~size (psd-header-width self) density)
+            (~size (psd-header-height self) density))))
+
+(define psd-depth : (-> PSD (Values Positive-Byte Positive-Byte))
+  (lambda [self]
+    (values (psd-header-depth self)
+            (psd-header-channels self))))
+
+(define psd-color-mode : (-> PSD PSD-Color-Mode)
+  (lambda [self]
+    (psd-header-color-mode self)))
+
+(define psd-composite-bitmap : (-> PSD (Instance Bitmap%))
+  (lambda [self]
+    (psd-ref! self section-image
+              (λ [image-data]
+                (psd-image-data->bitmap 'psd->bitmap image-data (psd-header-color-mode self)
+                                        (psd-header-width self) (psd-header-height self)
+                                        (psd-header-channels self) (psd-header-depth self)
+                                        (psd-section-compression-mode self) (psd-density self))))))
+
+(define psd-thumbnail-bitmap : (-> PSD (Option (Instance Bitmap%)))
+  (lambda [self]
+    (define maybe-preview : (Option PSD-Thumbnail) (psd-thumbnail self))
+    (and maybe-preview (psd-thumbnail-image maybe-preview))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define psd-resources : (-> PSD PSD-Image-Resources)
   (lambda [self]
     (psd-ref! self section-resources
@@ -66,43 +102,6 @@
                                      (cons (cons id (cons pascal (make-special-comment raw))) blocks))]
                         [(null? blocks) psd-empty-resources]
                         [else (make-hasheq blocks)]))))))
-
-(define psd-global-layer-mask : (-> PSD (Option PSD-Global-Mask))
-  (lambda [self]
-    (psd-ref! self section-global-mask
-              (λ [mask-info]
-                (psd-global-mask (parse-int16 mask-info 0)
-                                 (list (parse-uint16 mask-info 2)
-                                       (parse-uint16 mask-info 4)
-                                       (parse-uint16 mask-info 6)
-                                       (parse-uint16 mask-info 8))
-                                 (integer->mask-opacity (parse-int16 mask-info 10 index?))
-                                 (integer->mask-kind (parse-uint8 mask-info 12)))))))
-
-(define psd->bitmap : (-> PSD (Instance Bitmap%))
-  (lambda [self]
-    (psd-ref! self section-image
-              (λ [image-data]
-                (psd-image-data->bitmap 'psd->bitmap image-data (psd-header-color-mode self)
-                                        (psd-header-width self) (psd-header-height self)
-                                        (psd-header-channels self) (psd-header-depth self)
-                                        (psd-section-compression-mode self) (psd-density self))))))
-
-(define psd->thumbnail : (-> PSD (Option (Instance Bitmap%)))
-  (lambda [self]
-    (define maybe-preview : (Option PSD-Thumbnail) (psd-thumbnail self))
-    (and maybe-preview (psd-thumbnail-image maybe-preview))))
-
-(define psd-size : (-> PSD (Values Positive-Index Positive-Index))
-  (lambda [self]
-    (define density : Positive-Real (psd-density self))
-    (values (~size (psd-header-width self) density)
-            (~size (psd-header-height self) density))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define psd-grid+guides : (-> PSD (Option PSD-Grid+Guides)) (λ [self] (psd-assert (psd-resource-ref self #x408) psd-grid+guides?)))
-(define psd-thumbnail : (-> PSD (Option PSD-Thumbnail)) (λ [self] (psd-assert (psd-resource-ref self #x40C) psd-thumbnail?)))
-(define psd-file-info : (-> PSD (Option PSD-File-Info)) (λ [self] (psd-assert (psd-resource-ref self #x424) psd-file-info?)))
 
 (define psd-resource-ref : (-> PSD Integer (Option PSD-Resource))
   ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_38034
@@ -127,13 +126,30 @@
               (λ []
                 (when (psd-remove-unknown-resource?)
                   (hash-remove! resources id))
-                (throw-unsupported-error 'psd-resource-ref "unimplemeneted resource: 0x~X" id)))))))
+                (throw-unsupported-error 'psd-resource-ref "unimplemeneted resource: ~a" (psd-id->string id))))))))
 
 (define psd-resolve-resources : (->* (PSD) ((Listof Integer)) Void)
   (lambda [self [ids null]]
     (for ([id (in-list (if (null? ids) (hash-keys (psd-resources self)) ids))])
-      (with-handlers ([exn? void])
+      (with-handlers ([exn? psd-warn-broken-resource])
         (psd-resource-ref self id)))))
+
+(define psd-grid+guides : (-> PSD (Option PSD-Grid+Guides)) (λ [self] (psd-assert (psd-resource-ref self #x408) psd-grid+guides?)))
+(define psd-thumbnail : (-> PSD (Option PSD-Thumbnail)) (λ [self] (psd-assert (psd-resource-ref self #x40C) psd-thumbnail?)))
+(define psd-file-info : (-> PSD (Option PSD-File-Info)) (λ [self] (psd-assert (psd-resource-ref self #x424) psd-file-info?)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define psd-global-layer-mask : (-> PSD (Option PSD-Global-Mask))
+  (lambda [self]
+    (psd-ref! self section-global-mask
+              (λ [mask-info]
+                (psd-global-mask (parse-int16 mask-info 0)
+                                 (list (parse-uint16 mask-info 2)
+                                       (parse-uint16 mask-info 4)
+                                       (parse-uint16 mask-info 6)
+                                       (parse-uint16 mask-info 8))
+                                 (integer->mask-opacity (parse-int16 mask-info 10 index?))
+                                 (integer->mask-kind (parse-uint8 mask-info 12)))))))
 
 #;(define psd-profile : (->* () (Output-Port) Void)
   (lambda [[out (current-output-port)]]

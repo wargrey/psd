@@ -3,7 +3,7 @@
 (provide 0x3e8)
 
 (require "format.rkt")
-(require "misc.rkt")
+(require "../exn.rkt")
 
 (define 0x3e8 : (-> Integer Bytes String Null PSD-Resource)
   (lambda [id block name argl]

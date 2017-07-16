@@ -6,6 +6,7 @@
 (require "draw.rkt")
 (require "parser.rkt")
 (require "packbits.rkt")
+(require "exn.rkt")
 (require "unsafe/bitmap.rkt")
 
 (define psd-image-data->bitmap : (-> Symbol Bytes PSD-Color-Mode Positive-Index Positive-Index Positive-Byte Positive-Byte

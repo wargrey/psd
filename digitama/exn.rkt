@@ -1,0 +1,30 @@
+#lang typed/racket/base
+
+(provide (all-defined-out))
+
+(require "resource.rkt")
+
+(define throw-unsupported-error : (-> Symbol String Any * Nothing)
+  (lambda [func fmt . args]
+    (raise (make-exn:fail:unsupported (apply format (string-append "~a: " fmt) func args)
+                                      (continuation-marks #false)))))
+
+(define throw-obsolete-error : (-> Integer Any * Nothing)
+  (lambda [id . args]
+    (define idstr : String (psd-id->string id))
+    (define message : String
+      (cond [(null? args) idstr]
+            [(string? (car args)) (apply format (string-append idstr ": " (car args)) (cdr args))]
+            [else (format (string-append idstr ": ~s") args)]))
+    (raise (make-exn:fail:unsupported (format "obsolete resource: ~a" message) (continuation-marks #false)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define psd-id->string : (-> Integer String)
+  (lambda [id]
+    (define ID : String (string-upcase (format (if (< id #x1000) "0~x" "~x") id)))
+    (string-append "0x" ID "(" (number->string id) ")")))
+
+(define psd-warn-broken-resource : (-> exn False)
+  (lambda [e]
+    (log-message (current-logger) 'warning 'exn:psd:resource (exn-message e) e)
+    #false))

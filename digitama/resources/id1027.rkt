@@ -3,7 +3,7 @@
 (provide 0x403)
 
 (require "format.rkt")
-(require "misc.rkt")
+(require "../exn.rkt")
 
 (define 0x403 : (-> Integer Bytes String Null PSD-Resource)
   (lambda [id block name args]

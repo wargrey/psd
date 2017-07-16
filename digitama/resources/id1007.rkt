@@ -4,7 +4,7 @@
 
 (require "format.rkt")
 (require "id1077.rkt")
-(require "misc.rkt")
+(require "../exn.rkt")
 
 (define 0x3ef : (-> Integer Bytes String (List Boolean) PSD-Resource)
   (lambda [id block name id1077?]
