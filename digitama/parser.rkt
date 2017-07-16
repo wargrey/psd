@@ -23,8 +23,9 @@
                   (let fill-string! ([src-idx : Integer (fx+ start 4)]
                                      [dest-idx : Integer 0])
                     (string-set! buffer dest-idx (parse-char src src-idx))
-                    (cond [(fx= dest-idx max-idx) (values buffer (assert (fx* size 2) index?))]
-                          [else (fill-string! (fx+ src-idx 2) (fx+ dest-idx 1))])))])))
+                    (if (fx< dest-idx max-idx)
+                        (fill-string! (fx+ src-idx 2) (fx+ dest-idx 1))
+                        (values buffer (assert (fx* size 2) index?)))))])))
 
 (define parse-char : (-> Bytes Integer Char)
   (lambda [src start]
