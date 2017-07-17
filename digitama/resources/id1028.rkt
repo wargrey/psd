@@ -40,6 +40,44 @@
 (define parse-iimv4 : (-> Byte Byte Bytes Integer Integer Bytes)
   (lambda [record dataset src start size]
     (case record
+      [(1) (parse-object-envelope-record dataset src start size)]
+      [(2) (parse-application-record dataset src start size)]
+      [(3) (parse-digital-newsphoto-parameter-record dataset src start size)]
+      [(4 5) (parse-not-allocated-record dataset src start size)]
+      [(6) (parse-abstract-relationship-record dataset src start size)]
+      [(7) (parse-pre-object-data-descriptor-record dataset src start size)]
+      [(8) (parse-object-data-descriptor-record dataset src start size)]
+      [(9) (parse-post-object-data-descriptor-record dataset src start size)]
       [else (parse-nbytes src start size)])))
 
-;(define parse-iimv4-record1)
+(define parse-object-envelope-record : (-> Byte Bytes Integer Integer Bytes)
+  (lambda [dataset src start size]
+    (parse-nbytes src start size)))
+
+(define parse-application-record : (-> Byte Bytes Integer Integer Bytes)
+  (lambda [dataset src start size]
+    (parse-nbytes src start size)))
+
+(define parse-digital-newsphoto-parameter-record : (-> Byte Bytes Integer Integer Bytes)
+  (lambda [dataset src start size]
+    (parse-nbytes src start size)))
+
+(define parse-not-allocated-record : (-> Byte Bytes Integer Integer Bytes)
+  (lambda [dataset src start size]
+    (parse-nbytes src start size)))
+
+(define parse-abstract-relationship-record : (-> Byte Bytes Integer Integer Bytes)
+  (lambda [dataset src start size]
+    (parse-nbytes src start size)))
+
+(define parse-pre-object-data-descriptor-record : (-> Byte Bytes Integer Integer Bytes)
+  (lambda [dataset src start size]
+    (parse-nbytes src start size)))
+
+(define parse-object-data-descriptor-record : (-> Byte Bytes Integer Integer Bytes)
+  (lambda [dataset src start size]
+    (parse-nbytes src start size)))
+
+(define parse-post-object-data-descriptor-record : (-> Byte Bytes Integer Integer Bytes)
+  (lambda [dataset src start size]
+    (parse-nbytes src start size)))

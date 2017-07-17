@@ -34,6 +34,17 @@
    [vertical : Integer]
    [guides : (Listof (Pairof Integer PSD-Guide-Direction))]))
 
+(struct: psd-print-flags : PSD-Print-Flags psd-resource ; 1011
+  ([labels : Boolean]
+   [crop-marks : Boolean]
+   [color-bars : Boolean]
+   [registration-marks : Boolean]
+   [negative : Boolean]
+   [flip : Boolean]
+   [interpolate : Boolean]
+   [caption : Boolean]
+   [print-flags : Boolean]))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define-enumeration* psd-thumbnail-format #:+> PSD-Thumbnail-Format ; order matters
   thumbnail-format->integer integer->thumbnail-format
