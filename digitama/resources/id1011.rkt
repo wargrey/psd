@@ -7,7 +7,7 @@
 
 (define 0x3f3 : (-> Integer Bytes String Null PSD-Print-Flags)
   (lambda [id block name args]
-    (psd-print-flags id name
+    (PSD-Print-Flags id name
                      (> (parse-uint8 block 0) 0)
                      (> (parse-uint8 block 1) 0)
                      (> (parse-uint8 block 2) 0)

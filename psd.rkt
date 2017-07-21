@@ -13,6 +13,7 @@
 (require "digitama/exn.rkt")
 
 (require "digitama/layer.rkt")
+(require "digitama/layer/record.rkt")
 
 (require "digitama/resource.rkt")
 (require "digitama/resources/format.rkt")
@@ -21,7 +22,8 @@
 (define psd-remove-broken-resource? : (Parameterof Boolean) (make-parameter #false))
 (define psd-remove-unknown-resource? : (Parameterof Boolean) (make-parameter #true))
 
-(struct: psd : PSD psd-section ([density : Positive-Real])
+(struct PSD PSD-Section ([density : Positive-Real])
+  #:transparent
   #:constructor-name make-psd/but-read-psd-should-be-used-instead
   #:property prop:convertible
   (λ [[self : PSD] [request : Symbol] [default : Any]]
@@ -54,41 +56,41 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define psd-large-document? : (-> PSD Boolean)
   (lambda [self]
-    (eq? (psd-header-version self) 'PSB)))
+    (eq? (PSD-Header-version self) 'PSB)))
 
 (define psd-size : (-> PSD (Values Positive-Index Positive-Index))
   (lambda [self]
-    (define density : Positive-Real (psd-density self))
-    (values (~size (psd-header-width self) density)
-            (~size (psd-header-height self) density))))
+    (define density : Positive-Real (PSD-density self))
+    (values (~size (PSD-Header-width self) density)
+            (~size (PSD-Header-height self) density))))
 
 (define psd-depth : (-> PSD (Values Positive-Byte Positive-Byte))
   (lambda [self]
-    (values (psd-header-depth self)
-            (psd-header-channels self))))
+    (values (PSD-Header-depth self)
+            (PSD-Header-channels self))))
 
 (define psd-color-mode : (-> PSD PSD-Color-Mode)
   (lambda [self]
-    (psd-header-color-mode self)))
+    (PSD-Header-color-mode self)))
 
 (define psd-composite-bitmap : (-> PSD (Instance Bitmap%))
   (lambda [self]
-    (psd-ref! self section-image
+    (psd-ref! self Section-image
               (λ [image-data]
-                (psd-image-data->bitmap 'psd->bitmap image-data (psd-header-color-mode self)
-                                        (psd-header-width self) (psd-header-height self)
-                                        (psd-header-channels self) (psd-header-depth self)
-                                        (psd-section-compression-mode self) (psd-density self))))))
+                (psd-image-data->bitmap 'psd->bitmap image-data (PSD-Header-color-mode self)
+                                        (PSD-Header-width self) (PSD-Header-height self)
+                                        (PSD-Header-channels self) (PSD-Header-depth self)
+                                        (PSD-Section-compression-mode self) (PSD-density self))))))
 
 (define psd-thumbnail-bitmap : (-> PSD (Option (Instance Bitmap%)))
   (lambda [self]
     (define maybe-preview : (Option PSD-Thumbnail) (psd-thumbnail self))
-    (and maybe-preview (psd-thumbnail-image maybe-preview))))
+    (and maybe-preview (PSD-Thumbnail-image maybe-preview))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define psd-resources : (-> PSD PSD-Image-Resources)
   (lambda [self]
-    (psd-ref! self section-resources
+    (psd-ref! self Section-resources
               (λ [resource-data]
                 (let parse-8BIM : PSD-Image-Resources ([start : Fixnum 0]
                                                        [blocks : (Listof (Pairof Fixnum PSD-Resource-Block)) null])
@@ -109,7 +111,7 @@
   (lambda [self id]
     (define resources : PSD-Image-Resources (psd-resources self))
     (define maybe-res (hash-ref resources id void))
-    (or (and (psd-resource? maybe-res) maybe-res)
+    (or (and (PSD-Resource? maybe-res) maybe-res)
         (and (pair? maybe-res)
              (psd-parse-resource
               id
@@ -118,10 +120,10 @@
                 (define resource : (Option PSD-Resource)
                   (with-handlers ([exn:fail? psd-warn-broken-resource])
                     (case id
-                      [(#x040C) (parse id block name (list (psd-density self)))]
+                      [(#x040C) (parse id block name (list (PSD-density self)))]
                       [(#x03EF) (parse id block name (list (hash-has-key? resources #x0435)))]
                       [else (parse id block name null)])))
-                (cond [(psd-resource? resource) (hash-set! resources id resource)]
+                (cond [(PSD-Resource? resource) (hash-set! resources id resource)]
                       [(psd-remove-broken-resource?) (hash-remove! resources id)])
                 resource)
               (λ []
@@ -135,60 +137,30 @@
       (with-handlers ([exn? psd-warn-broken-resource])
         (psd-resource-ref self id)))))
 
-(define psd-grid+guides : (-> PSD (Option PSD-Grid+Guides)) (λ [self] (psd-assert (psd-resource-ref self #x408) psd-grid+guides?)))
-(define psd-thumbnail : (-> PSD (Option PSD-Thumbnail)) (λ [self] (psd-assert (psd-resource-ref self #x40C) psd-thumbnail?)))
-(define psd-file-info : (-> PSD (Option PSD-File-Info)) (λ [self] (psd-assert (psd-resource-ref self #x424) psd-file-info?)))
+(define psd-grid+guides : (-> PSD (Option PSD-Grid+Guides)) (λ [self] (psd-assert (psd-resource-ref self #x408) PSD-Grid+Guides?)))
+(define psd-thumbnail : (-> PSD (Option PSD-Thumbnail)) (λ [self] (psd-assert (psd-resource-ref self #x40C) PSD-Thumbnail?)))
+(define psd-file-info : (-> PSD (Option PSD-File-Info)) (λ [self] (psd-assert (psd-resource-ref self #x424) PSD-File-Info?)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define psd-layers : (-> PSD (Listof PSD-Layer))
   (lambda [self]
-    (psd-ref! self section-layers
+    (psd-ref! self Section-layers
               (λ [layer-info]
                 (let ([count : Fixnum (parse-int16 layer-info 0)])
                   (define-values (psd/psb-size channel-step) (if (psd-large-document? self) (values 8 10) (values 4 6)))
-                  (let cons-layer : (Listof PSD-Layer) ([sreyal : (Listof PSD-Layer) null]
+                  (let parse-layer : (Listof PSD-Layer) ([sreyal : (Listof PSD-Layer) null]
                                                         [rest : Fixnum (fxabs count)]
                                                         [idx : Fixnum 2])
-                    (cond [(fx= rest 0) (reverse sreyal)]
-                          [else (let ([channel-count (parse-size layer-info (fx+ idx 16) 2)])
-                                  (define-values (top left bottom right)
-                                    (values (parse-int32 layer-info (fx+ idx 0))
-                                            (parse-int32 layer-info (fx+ idx 4))
-                                            (parse-int32 layer-info (fx+ idx 8))
-                                            (parse-int32 layer-info (fx+ idx 12))))
-                                  (define-values (channels signature-idx)
-                                    (let cons-info : (Values (Listof (Pairof Fixnum Index)) Fixnum)
-                                      ([channel-No. : Fixnum 0]
-                                       [channel-start : Fixnum (fx+ idx 18)]
-                                       [slennahc : (Listof (Pairof Fixnum Index)) null])
-                                      (cond [(fx= channel-No. channel-count) (values (reverse slennahc) channel-start)]
-                                            [else (cons-info (fx+ channel-No. 1)
-                                                             (fx+ channel-start channel-step)
-                                                             (cons (cons (parse-int16 layer-info channel-start)
-                                                                         (parse-size layer-info (fx+ channel-start 2) psd/psb-size))
-                                                                   slennahc))])))
-                                  (define signature : Bytes (parse-nbytes layer-info signature-idx 4))
-                                  (unless (equal? signature #"8BIM")
-                                    (raise-user-error 'psd-layers "not an valid layer record: ~a" signature))
-                                  (define blend : PSD-Blend-Mode (parse-keyword layer-info (fx+ signature-idx 4) 4 psd-blend-mode?))
-                                  (define-values (opacity clipping flags size)
-                                    (values (parse-uint8 layer-info (fx+ signature-idx 8))
-                                            (parse-uint8 layer-info (fx+ signature-idx 9))
-                                            (parse-uint8 layer-info (fx+ signature-idx 10))
-                                            (parse-size layer-info (fx+ signature-idx 12) 4)))
-                                  (cons-layer (cons (psd-layer (vector top left
-                                                                       (assert (fx- right left) index?)
-                                                                       (assert (fx- bottom top) index?))
-                                                               channels blend opacity clipping flags)
-                                                    sreyal)
-                                              (fx- rest 1)
-                                              (fx+ (fx+ signature-idx 16) size)))])))))))
+                    (if (fx> rest 0)
+                        (let-values ([(layer next-idx) (parse-layer-record layer-info idx psd/psb-size channel-step)])
+                          (parse-layer (cons layer sreyal) (fx- rest 1) next-idx))
+                        (reverse sreyal))))))))
 
 (define psd-global-layer-mask : (-> PSD (Option PSD-Global-Mask))
   (lambda [self]
-    (psd-ref! self section-global-mask
+    (psd-ref! self Section-global-mask
               (λ [mask-info]
-                (psd-global-mask (parse-int16 mask-info 0)
+                (PSD-Global-Mask (parse-int16 mask-info 0)
                                  (list (parse-uint16 mask-info 2)
                                        (parse-uint16 mask-info 4)
                                        (parse-uint16 mask-info 6)

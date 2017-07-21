@@ -8,7 +8,7 @@
 
 (define 0x40c : (-> Integer Bytes String (List Positive-Real) PSD-Thumbnail)
   (lambda [id block name argl]
-    (psd-thumbnail id name
+    (PSD-Thumbnail id name
                    (integer->thumbnail-format (parse-int32 block 0))
                    (parse-size block 4  4 positive-fixnum?) ; width
                    (parse-size block 8  4 positive-fixnum?) ; height

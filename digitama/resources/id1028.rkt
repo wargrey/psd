@@ -20,7 +20,7 @@
              (parse (fx+ (fx+ start 5) data-size)
                     (cons (cons (make-rectangular record: dataset) data) entries))]
             [else (displayln (reverse entries))]))
-    (psd-file-info id name iptc-naa)))
+    (PSD-File-Info id name iptc-naa)))
 
 (define parse-dataset : (-> Bytes Integer (Values Byte Byte Natural Bytes))
   (lambda [iptc-naa start]

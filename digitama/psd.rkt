@@ -9,7 +9,7 @@
 
 (require (for-syntax racket/base))
 
-(struct psd-header
+(struct PSD-Header
   ([version : PSD-Version]
    [channels : Positive-Byte]
    [width : Positive-Index]
@@ -18,7 +18,7 @@
    [color-mode : PSD-Color-Mode])
   #:transparent)
 
-(struct psd-section psd-header
+(struct PSD-Section PSD-Header
   ([color-data : Special-Comment]
    [resources : (U PSD-Image-Resources Special-Comment)]
    [layers : (U Special-Comment (Listof PSD-Layer))]
@@ -45,8 +45,8 @@
 (define-syntax (psd-ref! stx)
   (syntax-case stx [λ lambda]
     [(_ self field (λ [maybe-val] make-val ...))
-     (with-syntax ([psd-field (datum->syntax #'field (string->symbol (format "psd-~a" (syntax-e #'field))))]
-                   [set-psd-field! (datum->syntax #'field (string->symbol (format "set-psd-~a!" (syntax-e #'field))))])
+     (with-syntax ([psd-field (datum->syntax #'field (string->symbol (format "PSD-~a" (syntax-e #'field))))]
+                   [set-psd-field! (datum->syntax #'field (string->symbol (format "set-PSD-~a!" (syntax-e #'field))))])
        #'(let ([maybe-val (psd-unbox (psd-field self))])
            (cond [(not (bytes? maybe-val)) maybe-val]
                  [else (let ([tmp (let () make-val ...)]) (set-psd-field! self tmp) tmp)])))]

@@ -99,11 +99,6 @@
               (read-8BIMs smart-size in))
         null)))
 
-(define bit-at? : (-> Integer Integer Boolean)
-  (lambda [flg bp]
-    (let ([b (arithmetic-shift 1 bp)])
-      (= (bitwise-and flg b) b))))
-
 (define nbytes-pairs : (-> Fixnum (Listof Index) (Listof (Pairof Integer Integer)))
   (lambda [start bsizes]
     (let parse ([last-end : Fixnum start]

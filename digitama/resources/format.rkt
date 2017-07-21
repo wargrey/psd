@@ -1,20 +1,20 @@
 #lang typed/racket/base
 
-(provide (all-defined-out) PSD-Resource)
-(provide (struct-out psd-resource))
+(provide (all-defined-out))
+(provide (struct-out PSD-Resource))
 
 (require "../resource.rkt")
 (require "../draw.rkt")
 (require "../misc.rkt")
 
-(struct: psd-version-info : PSD-Version-Info psd-resource ; 1057
+(struct PSD-Version-Info PSD-Resource ; 1057
   ([version : Index]
    [has-real-merged-data? : Boolean]
    [writer : String]
    [reader : String]
    [file-version : Index]))
 
-(struct: psd-thumbnail : PSD-Thumbnail psd-resource ; 1036
+(struct PSD-Thumbnail PSD-Resource    ; 1036
   ([format : PSD-Thumbnail-Format]
    [width : Positive-Fixnum]
    [height : Positive-Fixnum]
@@ -25,16 +25,16 @@
    [planes : Index]
    [image : (Instance Bitmap%)]))
 
-(struct: psd-file-info : PSD-File-Info psd-resource ; 1028 1060
+(struct PSD-File-Info PSD-Resource    ; 1028 1060
   ([raw : Bytes]))
 
-(struct: psd-grid+guides : PSD-Grid+Guides psd-resource ; 1032
+(struct PSD-Grid+Guides PSD-Resource  ; 1032
   ([version : Fixnum]
    [horizontal : Fixnum]
    [vertical : Fixnum]
    [guides : (Listof (Pairof Fixnum PSD-Guide-Direction))]))
 
-(struct: psd-print-flags : PSD-Print-Flags psd-resource ; 1011
+(struct PSD-Print-Flags PSD-Resource  ; 1011
   ([labels : Boolean]
    [crop-marks : Boolean]
    [color-bars : Boolean]

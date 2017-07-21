@@ -10,6 +10,7 @@
 
 (define psd-empty-resources : PSD-Image-Resources (make-hasheq))
 
-(struct: psd-resource : PSD-Resource
+(struct PSD-Resource
   ([id : Integer]
-   [name : String]))
+   [name : String])
+  #:transparent)

@@ -7,12 +7,6 @@
 (require (for-syntax racket/sequence))
 (require (for-syntax syntax/parse))
 
-(define-syntax (struct: stx)
-  (syntax-case stx [:]
-    [(_ id : ID rest ...)
-     #'(begin (struct id rest ... #:transparent)
-              (define-type ID id))]))
-
 (define-syntax (define-enumeration stx)
   (syntax-case stx [:]
     [(_ id : TypeU #:with kw->enum #:-> EnumType [enum value] ...)

@@ -10,7 +10,7 @@
 
 (define 0x408 : (-> Integer Bytes String Null PSD-Grid+Guides)
   (lambda [id block name argl]
-    (psd-grid+guides id name
+    (PSD-Grid+Guides id name
                      (parse-uint32 block 0) ; version
                      (parse-uint32 block 4) ; horizontal
                      (parse-uint32 block 8) ; vertical
