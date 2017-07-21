@@ -16,11 +16,11 @@
 
 (struct: psd-thumbnail : PSD-Thumbnail psd-resource ; 1036
   ([format : PSD-Thumbnail-Format]
-   [width : Positive-Integer]
-   [height : Positive-Integer]
-   [widthbytes : Positive-Integer]
-   [size : Positive-Integer]
-   [compressed-size : Positive-Integer]
+   [width : Positive-Fixnum]
+   [height : Positive-Fixnum]
+   [widthbytes : Positive-Fixnum]
+   [size : Positive-Fixnum]
+   [compressed-size : Positive-Fixnum]
    [depth : Byte]
    [planes : Index]
    [image : (Instance Bitmap%)]))
@@ -29,10 +29,10 @@
   ([raw : Bytes]))
 
 (struct: psd-grid+guides : PSD-Grid+Guides psd-resource ; 1032
-  ([version : Integer]
-   [horizontal : Integer]
-   [vertical : Integer]
-   [guides : (Listof (Pairof Integer PSD-Guide-Direction))]))
+  ([version : Fixnum]
+   [horizontal : Fixnum]
+   [vertical : Fixnum]
+   [guides : (Listof (Pairof Fixnum PSD-Guide-Direction))]))
 
 (struct: psd-print-flags : PSD-Print-Flags psd-resource ; 1011
   ([labels : Boolean]

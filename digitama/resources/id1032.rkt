@@ -15,8 +15,8 @@
                      (parse-uint32 block 4) ; horizontal
                      (parse-uint32 block 8) ; vertical
                      (let parse-guide ([fgridcount : Index (parse-size block 12 4)]
-                                       [start : Integer 16]
-                                       [guides : (Listof (Pairof Integer PSD-Guide-Direction)) null])
+                                       [start : Fixnum 16]
+                                       [guides : (Listof (Pairof Fixnum PSD-Guide-Direction)) null])
                        (cond [(fx= fgridcount 0) (reverse guides)]
                              [else (parse-guide (fx- fgridcount 1)
                                                 (fx+ start 5)

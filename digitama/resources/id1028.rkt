@@ -37,7 +37,7 @@
                                  (psd-id->string 1028)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define parse-iimv4 : (-> Byte Byte Bytes Integer Integer Bytes)
+(define parse-iimv4 : (-> Byte Byte Bytes Fixnum Fixnum Bytes)
   (lambda [record dataset src start size]
     (case record
       [(1) (parse-object-envelope-record dataset src start size)]
@@ -50,34 +50,34 @@
       [(9) (parse-post-object-data-descriptor-record dataset src start size)]
       [else (parse-nbytes src start size)])))
 
-(define parse-object-envelope-record : (-> Byte Bytes Integer Integer Bytes)
+(define parse-object-envelope-record : (-> Byte Bytes Fixnum Fixnum Bytes)
   (lambda [dataset src start size]
     (parse-nbytes src start size)))
 
-(define parse-application-record : (-> Byte Bytes Integer Integer Bytes)
+(define parse-application-record : (-> Byte Bytes Fixnum Fixnum Bytes)
   (lambda [dataset src start size]
     (parse-nbytes src start size)))
 
-(define parse-digital-newsphoto-parameter-record : (-> Byte Bytes Integer Integer Bytes)
+(define parse-digital-newsphoto-parameter-record : (-> Byte Bytes Fixnum Fixnum Bytes)
   (lambda [dataset src start size]
     (parse-nbytes src start size)))
 
-(define parse-not-allocated-record : (-> Byte Bytes Integer Integer Bytes)
+(define parse-not-allocated-record : (-> Byte Bytes Fixnum Fixnum Bytes)
   (lambda [dataset src start size]
     (parse-nbytes src start size)))
 
-(define parse-abstract-relationship-record : (-> Byte Bytes Integer Integer Bytes)
+(define parse-abstract-relationship-record : (-> Byte Bytes Fixnum Fixnum Bytes)
   (lambda [dataset src start size]
     (parse-nbytes src start size)))
 
-(define parse-pre-object-data-descriptor-record : (-> Byte Bytes Integer Integer Bytes)
+(define parse-pre-object-data-descriptor-record : (-> Byte Bytes Fixnum Fixnum Bytes)
   (lambda [dataset src start size]
     (parse-nbytes src start size)))
 
-(define parse-object-data-descriptor-record : (-> Byte Bytes Integer Integer Bytes)
+(define parse-object-data-descriptor-record : (-> Byte Bytes Fixnum Fixnum Bytes)
   (lambda [dataset src start size]
     (parse-nbytes src start size)))
 
-(define parse-post-object-data-descriptor-record : (-> Byte Bytes Integer Integer Bytes)
+(define parse-post-object-data-descriptor-record : (-> Byte Bytes Fixnum Fixnum Bytes)
   (lambda [dataset src start size]
     (parse-nbytes src start size)))

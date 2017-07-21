@@ -21,9 +21,9 @@
 (struct psd-section psd-header
   ([color-data : Special-Comment]
    [resources : (U PSD-Image-Resources Special-Comment)]
-   [layers : Special-Comment]
+   [layers : (U Special-Comment (Listof PSD-Layer))]
    [global-mask : (U PSD-Global-Mask Special-Comment False)]
-   [tagged-blocks : Special-Comment]
+   [tagged-blocks : (U Special-Comment False)]
    [compression-mode : PSD-Compression-Mode]
    [image : (U (Instance Bitmap%) Special-Comment)])
   #:transparent #:mutable)

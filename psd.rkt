@@ -9,9 +9,10 @@
 (require "digitama/stdin.rkt")
 (require "digitama/bitmap.rkt")
 (require "digitama/parser.rkt")
-(require "digitama/layer.rkt")
 (require "digitama/misc.rkt")
 (require "digitama/exn.rkt")
+
+(require "digitama/layer.rkt")
 
 (require "digitama/resource.rkt")
 (require "digitama/resources/format.rkt")
@@ -39,9 +40,9 @@
           (make-psd/but-read-psd-should-be-used-instead
            (integer->version version) channels width height depth color-mode 
            (make-special-comment color-mode-data) (make-special-comment image-resources)
-           (make-special-comment layer-info)
+           (if layer-info (make-special-comment layer-info) null)
            (and mask-info (make-special-comment mask-info))
-           (make-special-comment tagged-blocks)
+           (and tagged-blocks (make-special-comment tagged-blocks))
            compression-mode (make-special-comment image-data) density))
         (let-values ([(path scale) (select-psd-file /dev/psdin density try-@2x?)])
           (call-with-input-file* path (λ [[psdin : Input-Port]] (read-psd psdin #:backing-scale scale)))))))
@@ -89,14 +90,14 @@
   (lambda [self]
     (psd-ref! self section-resources
               (λ [resource-data]
-                (let parse-8BIM : PSD-Image-Resources ([start : Integer 0]
-                                                       [blocks : (Listof (Pairof Integer PSD-Resource-Block)) null])
+                (let parse-8BIM : PSD-Image-Resources ([start : Fixnum 0]
+                                                       [blocks : (Listof (Pairof Fixnum PSD-Resource-Block)) null])
                   (cond [(and (regexp-match? #px"^8BIM" resource-data start) (index? start))
-                         (define id : Integer (parse-int16 resource-data (fx+ start 4)))
+                         (define id : Fixnum (parse-int16 resource-data (fx+ start 4)))
                          (define-values (pascal psize) (parse-pascal-string resource-data (fx+ start 6)))
-                         (define size-start : Integer (fx+ (fx+ start 8) (fx+ psize (fxremainder psize 2))))
-                         (define data-size : Integer (parse-size resource-data size-start 4))
-                         (define data-start : Integer (fx+ size-start 4))
+                         (define size-start : Fixnum (fx+ (fx+ start 8) (fx+ psize (fxremainder psize 2))))
+                         (define data-size : Index (parse-size resource-data size-start 4))
+                         (define data-start : Fixnum (fx+ size-start 4))
                          (define raw : Bytes (parse-nbytes resource-data data-start data-size))
                          (parse-8BIM (fx+ (fx+ data-start data-size) (fxremainder data-size 2))
                                      (cons (cons id (cons pascal (make-special-comment raw))) blocks))]
@@ -139,6 +140,50 @@
 (define psd-file-info : (-> PSD (Option PSD-File-Info)) (λ [self] (psd-assert (psd-resource-ref self #x424) psd-file-info?)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define psd-layers : (-> PSD (Listof PSD-Layer))
+  (lambda [self]
+    (psd-ref! self section-layers
+              (λ [layer-info]
+                (let ([count : Fixnum (parse-int16 layer-info 0)])
+                  (define-values (psd/psb-size channel-step) (if (psd-large-document? self) (values 8 10) (values 4 6)))
+                  (let cons-layer : (Listof PSD-Layer) ([sreyal : (Listof PSD-Layer) null]
+                                                        [rest : Fixnum (fxabs count)]
+                                                        [idx : Fixnum 2])
+                    (cond [(fx= rest 0) (reverse sreyal)]
+                          [else (let ([channel-count (parse-size layer-info (fx+ idx 16) 2)])
+                                  (define-values (top left bottom right)
+                                    (values (parse-int32 layer-info (fx+ idx 0))
+                                            (parse-int32 layer-info (fx+ idx 4))
+                                            (parse-int32 layer-info (fx+ idx 8))
+                                            (parse-int32 layer-info (fx+ idx 12))))
+                                  (define-values (channels signature-idx)
+                                    (let cons-info : (Values (Listof (Pairof Fixnum Index)) Fixnum)
+                                      ([channel-No. : Fixnum 0]
+                                       [channel-start : Fixnum (fx+ idx 18)]
+                                       [slennahc : (Listof (Pairof Fixnum Index)) null])
+                                      (cond [(fx= channel-No. channel-count) (values (reverse slennahc) channel-start)]
+                                            [else (cons-info (fx+ channel-No. 1)
+                                                             (fx+ channel-start channel-step)
+                                                             (cons (cons (parse-int16 layer-info channel-start)
+                                                                         (parse-size layer-info (fx+ channel-start 2) psd/psb-size))
+                                                                   slennahc))])))
+                                  (define signature : Bytes (parse-nbytes layer-info signature-idx 4))
+                                  (unless (equal? signature #"8BIM")
+                                    (raise-user-error 'psd-layers "not an valid layer record: ~a" signature))
+                                  (define blend : PSD-Blend-Mode (parse-keyword layer-info (fx+ signature-idx 4) 4 psd-blend-mode?))
+                                  (define-values (opacity clipping flags size)
+                                    (values (parse-uint8 layer-info (fx+ signature-idx 8))
+                                            (parse-uint8 layer-info (fx+ signature-idx 9))
+                                            (parse-uint8 layer-info (fx+ signature-idx 10))
+                                            (parse-size layer-info (fx+ signature-idx 12) 4)))
+                                  (cons-layer (cons (psd-layer (vector top left
+                                                                       (assert (fx- right left) index?)
+                                                                       (assert (fx- bottom top) index?))
+                                                               channels blend opacity clipping flags)
+                                                    sreyal)
+                                              (fx- rest 1)
+                                              (fx+ (fx+ signature-idx 16) size)))])))))))
+
 (define psd-global-layer-mask : (-> PSD (Option PSD-Global-Mask))
   (lambda [self]
     (psd-ref! self section-global-mask
