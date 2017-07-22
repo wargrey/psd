@@ -12,7 +12,8 @@
    [has-real-merged-data? : Boolean]
    [writer : String]
    [reader : String]
-   [file-version : Index]))
+   [file-version : Index])
+  #:transparent)
 
 (struct PSD-Thumbnail PSD-Resource    ; 1036
   ([format : PSD-Thumbnail-Format]
@@ -23,16 +24,19 @@
    [compressed-size : Positive-Fixnum]
    [depth : Byte]
    [planes : Index]
-   [image : (Instance Bitmap%)]))
+   [image : (Instance Bitmap%)])
+  #:transparent)
 
 (struct PSD-File-Info PSD-Resource    ; 1028 1060
-  ([raw : Bytes]))
+  ([raw : Bytes])
+  #:transparent)
 
 (struct PSD-Grid+Guides PSD-Resource  ; 1032
   ([version : Fixnum]
    [horizontal : Fixnum]
    [vertical : Fixnum]
-   [guides : (Listof (Pairof Fixnum PSD-Guide-Direction))]))
+   [guides : (Listof (Pairof Fixnum PSD-Guide-Direction))])
+  #:transparent)
 
 (struct PSD-Print-Flags PSD-Resource  ; 1011
   ([labels : Boolean]
@@ -43,7 +47,8 @@
    [flip : Boolean]
    [interpolate : Boolean]
    [caption : Boolean]
-   [print-flags : Boolean]))
+   [print-flags : Boolean])
+  #:transparent)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define-enumeration* psd-thumbnail-format #:+> PSD-Thumbnail-Format ; order matters

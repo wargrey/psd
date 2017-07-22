@@ -11,30 +11,26 @@
   (lambda [src start]
     (define size : Byte (bytes-ref src start))
     (define bstart : Fixnum (fx+ start 1))
-    (values (bytes->string/utf-8 src #false bstart (fx+ bstart size))
-            size)))
+    (define bend : Fixnum (fx+ bstart size))
+    ; TODO: Pascal String may not be encoded as UTF-8
+    (values (bytes->string/latin-1 src #false bstart bend) size)))
 
 (define parse-unicode-string : (-> Bytes Fixnum (Values String Index))
   (lambda [src start]
     (define size : Index (parse-uint32 src start index?))
-    (cond [(fx= size 0) (values "" 0)]
-          [else (let ([buffer (make-string size #\null)]
-                      [max-idx (fx- size 1)])
-                  (let fill-string! ([src-idx : Fixnum (fx+ start 4)]
-                                     [dest-idx : Fixnum 0])
-                    (string-set! buffer dest-idx (parse-char src src-idx))
-                    (if (fx< dest-idx max-idx)
-                        (fill-string! (fx+ src-idx 2) (fx+ dest-idx 1))
-                        (values buffer (assert (fx* size 2) index?)))))])))
+    (cond [(fx= size 0) (values "" size)]
+          [else (let-values ([(unicode chwidth) (values (make-string size #\null) 2)])
+                  (let fill-string! ([dest-idx : Fixnum 0] [src-idx : Fixnum (fx+ start 4)])
+                    (when (fx< dest-idx size)
+                      (define next-idx : Fixnum (fx+ src-idx chwidth))
+                      (string-set! unicode dest-idx (integer->char (integer-bytes->integer src #false #true src-idx next-idx)))
+                      (fill-string! (fx+ dest-idx 1) next-idx)))
+                  (values unicode (assert (fx* size chwidth) index?)))])))
 
 (define parse-keyword : (All (a) (-> Bytes Fixnum Byte (-> Any Boolean : #:+ a) a))
   (lambda [src start size key?]
     (define key : String (bytes->string/utf-8 src #false start (fx+ start 4)))
     (assert (string->symbol key) key?)))
-
-(define parse-char : (-> Bytes Fixnum Char)
-  (lambda [src start]
-    (integer->char (parse-uint16 src start))))
 
 (define parse-int16 : (All (a) (case-> [Bytes Fixnum -> Fixnum]
                                        [Bytes Fixnum (-> Any Boolean : a) -> a]))

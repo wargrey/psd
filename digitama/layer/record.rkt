@@ -41,8 +41,12 @@
   (lambda [layer-info idx]
     (define size : Index (parse-size layer-info idx 4))
     (values (and (fx> size 0)
-                 (let ([rectangle (parse-rectangle layer-info (fx+ idx 4))])
-                   #false))
+                 (let ([rectangle (parse-rectangle layer-info (fx+ idx 4))]
+                       [defcolor (parse-uint8 layer-info (fx+ idx 20))]
+                       [flags (parse-uint8 layer-info (fx+ idx 21))])
+                   (cond [(fx= size 20) (PSD-Layer-Mask rectangle defcolor (mask-flags->symbols flags))]
+                         [else (let ([mask (parse-uint8 layer-info (fx+ idx 22))])
+                                 (PSD-Layer-Mask rectangle defcolor (mask-flags->symbols flags)))])))
             size)))
 
 (define parse-layer-blending-ranges : (-> Bytes Fixnum Index (Values PSD-Blending-Ranges Index))
@@ -89,3 +93,12 @@
                   (and (bitwise-bit-set? flag 1) 'invisible)
                   (and (bitwise-bit-set? flag 2) 'obsolete)
                   (and (bitwise-bit-set? flag 3) (bitwise-bit-set? flag 4) 'irrelevant)))))
+
+(define mask-flags->symbols : (-> Byte (Listof Symbol))
+  (lambda [flag]
+    (filter symbol?
+            (list (and (bitwise-bit-set? flag 0) 'relative)
+                  (and (bitwise-bit-set? flag 1) 'disabled)
+                  (and (bitwise-bit-set? flag 2) 'inversive)
+                  (and (bitwise-bit-set? flag 3) 'actual)
+                  (and (bitwise-bit-set? flag 4) 'parameterized)))))

@@ -31,7 +31,7 @@
   ([parameter : (U Byte Flonum)]
    [real-flags : (Listof Symbol)]
    [real-background : Byte]
-   [rectangle : PSD-Layer-Rectangle])
+   [real-rectangle : PSD-Layer-Rectangle])
   #:transparent)
 
 (struct PSD-Global-Mask
