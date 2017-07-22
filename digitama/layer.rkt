@@ -5,6 +5,7 @@
 (require "misc.rkt")
 
 (define-type PSD-Layer-Rectangle (Vector Fixnum Fixnum Index Index))
+(define-type PSD-Layer-Mask-Parameter (Vector (Option Byte) (Option Flonum) (Option Byte) (Option Flonum)))
 (define-type PSD-Blending-Range (Vector Byte Byte Byte Byte))
 (define-type PSD-Blending-Ranges (Pairof (Pairof PSD-Blending-Range PSD-Blending-Range)
                                          (Listof (Pairof PSD-Blending-Range PSD-Blending-Range))))
@@ -24,14 +25,14 @@
 (struct PSD-Layer-Mask
   ([rectangle : PSD-Layer-Rectangle]
    [default-color : Byte]
-   [flags : (Listof Symbol)])
+   [flags : (Listof Symbol)]
+   [parameter : PSD-Layer-Mask-Parameter])
   #:transparent)
 
-(struct PSD-Layer-Mask*
-  ([parameter : (U Byte Flonum)]
-   [real-flags : (Listof Symbol)]
-   [real-background : Byte]
-   [real-rectangle : PSD-Layer-Rectangle])
+(struct PSD-Layer-Real-Mask PSD-Layer-Mask
+  ([flags : (Listof Symbol)]
+   [background : Byte]
+   [rectangle : PSD-Layer-Rectangle])
   #:transparent)
 
 (struct PSD-Global-Mask

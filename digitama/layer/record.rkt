@@ -31,25 +31,32 @@
               (parse-uint8 layer-info (fx+ 8BIM-idx 9))
               (parse-uint8 layer-info (fx+ 8BIM-idx 10))
               (parse-size layer-info (fx+ 8BIM-idx 12) 4)))
-    (define-values (mask mask-size) (parse-layer-mask layer-info (fx+ 8BIM-idx 16)))
-    (define-values (blending-ranges ranges-size) (parse-layer-blending-ranges layer-info (fx+ (fx+ 8BIM-idx 20) mask-size) channel-count))
-    (define-values (name name-size) (parse-pascal-string layer-info (fx+ (fx+ 8BIM-idx 24) (fx+ mask-size ranges-size))))
+    (define-values (mask range-idx) (parse-layer-mask layer-info (fx+ 8BIM-idx 16)))
+    (define-values (blending-ranges name-idx) (parse-layer-blending-ranges layer-info range-idx channel-count))
+    (define-values (name 8B64-idx) (parse-pascal-string*n layer-info name-idx 4))
     (values (PSD-Layer name rectangle channels blend opacity (fx= clipping 0) (layer-flags->symbols flags) mask blending-ranges)
             (fx+ (fx+ 8BIM-idx 16) total))))
 
-(define parse-layer-mask : (-> Bytes Fixnum (Values (Option PSD-Layer-Mask) Index))
+(define parse-layer-mask : (-> Bytes Fixnum (Values (Option PSD-Layer-Mask) Fixnum))
   (lambda [layer-info idx]
     (define size : Index (parse-size layer-info idx 4))
     (values (and (fx> size 0)
                  (let ([rectangle (parse-rectangle layer-info (fx+ idx 4))]
                        [defcolor (parse-uint8 layer-info (fx+ idx 20))]
-                       [flags (parse-uint8 layer-info (fx+ idx 21))])
-                   (cond [(fx= size 20) (PSD-Layer-Mask rectangle defcolor (mask-flags->symbols flags))]
-                         [else (let ([mask (parse-uint8 layer-info (fx+ idx 22))])
-                                 (PSD-Layer-Mask rectangle defcolor (mask-flags->symbols flags)))])))
-            size)))
+                       [flags (parse-uint8 layer-info (fx+ idx 21))]
+                       [mask-idx (fx+ idx 22)])
+                   (define-values (parameter real-idx)
+                     (cond [(bitwise-bit-set? flags 4) (parse-mask-parameter layer-info mask-idx)]
+                           [else (values parameter-placeholder-for-mask mask-idx)]))
+                   (if (fx= (fx+ (fx+ idx 4) size) (fx+ real-idx 2))
+                       (PSD-Layer-Mask rectangle defcolor (mask-flags->symbols flags) parameter)
+                       (PSD-Layer-Real-Mask rectangle defcolor (mask-flags->symbols flags) parameter
+                                            (mask-flags->symbols (parse-uint8 layer-info (fx+ real-idx 0)))
+                                            (parse-uint8 layer-info (fx+ real-idx 1))
+                                            (parse-rectangle layer-info (fx+ real-idx 2))))))
+            (fx+ (fx+ idx 4) size))))
 
-(define parse-layer-blending-ranges : (-> Bytes Fixnum Index (Values PSD-Blending-Ranges Index))
+(define parse-layer-blending-ranges : (-> Bytes Fixnum Index (Values PSD-Blending-Ranges Fixnum))
   (lambda [layer-info idx count]
     (define size : Index (parse-size layer-info idx 4))
     (values (cons (parse-blending-range layer-info (fx+ idx 4))
@@ -60,9 +67,11 @@
                     (cond [(fx= rest 0) (reverse segnar)]
                           [else (parse-channel-ranges (fx- rest 1) (fx+ range-idx 8)
                                                       (cons (parse-blending-range layer-info range-idx) segnar))])))
-            size)))
+            (fx+ (fx+ idx 4) size))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define parameter-placeholder-for-mask : PSD-Layer-Mask-Parameter (vector #false #false #false #false))
+
 (define parse-rectangle : (-> Bytes Fixnum PSD-Layer-Rectangle)
   (lambda [layer-info idx]
     (define-values (top left bottom right)
@@ -71,6 +80,15 @@
               (parse-int32 layer-info (fx+ idx 8))
               (parse-int32 layer-info (fx+ idx 12))))
     (vector top left (assert (fx- right left) index?) (assert (fx- bottom top) index?))))
+
+(define parse-mask-parameter : (-> Bytes Fixnum (Values PSD-Layer-Mask-Parameter Fixnum))
+  (lambda [layer-info idx]
+    (define-values (mask i0) (values (parse-uint8 layer-info idx) (fx+ idx 1)))
+    (define-values (udensity i1) (if (bitwise-bit-set? mask 0) (values (parse-uint8 layer-info i0) (fx+ i0 1)) (values #false i0)))
+    (define-values (ufeather i2) (if (bitwise-bit-set? mask 1) (values (parse-double layer-info i1) (fx+ i1 8)) (values #false i1)))
+    (define-values (vdensity i3) (if (bitwise-bit-set? mask 2) (values (parse-uint8 layer-info i2) (fx+ i2 1)) (values #false i2)))
+    (define-values (vfeather i4) (if (bitwise-bit-set? mask 3) (values (parse-double layer-info i3) (fx+ i3 8)) (values #false i3)))
+    (values (vector udensity ufeather vdensity vfeather) i4)))
 
 (define parse-blending-range : (-> Bytes Fixnum (Pairof PSD-Blending-Range PSD-Blending-Range))
   (lambda [layer-info idx]
@@ -99,6 +117,6 @@
     (filter symbol?
             (list (and (bitwise-bit-set? flag 0) 'relative)
                   (and (bitwise-bit-set? flag 1) 'disabled)
-                  (and (bitwise-bit-set? flag 2) 'inversive)
+                  (and (bitwise-bit-set? flag 2) 'inverse)
                   (and (bitwise-bit-set? flag 3) 'actual)
                   (and (bitwise-bit-set? flag 4) 'parameterized)))))

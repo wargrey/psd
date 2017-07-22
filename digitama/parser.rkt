@@ -7,15 +7,17 @@
 
 (require "integer.rkt")
 
-(define parse-pascal-string : (-> Bytes Fixnum (Values String Byte))
+(define parse-pascal-string : (-> Bytes Fixnum (Values String Fixnum))
   (lambda [src start]
-    (define size : Byte (bytes-ref src start))
-    (define bstart : Fixnum (fx+ start 1))
-    (define bend : Fixnum (fx+ bstart size))
-    ; TODO: Pascal String may not be encoded as UTF-8
-    (values (bytes->string/latin-1 src #false bstart bend) size)))
+    (define-values (pascal _size pend) (pascal-string src start))
+    (values pascal pend)))
 
-(define parse-unicode-string : (-> Bytes Fixnum (Values String Index))
+(define parse-pascal-string*n : (-> Bytes Fixnum Byte (Values String Fixnum))
+  (lambda [src start n]
+    (define-values (pascal psize pend) (pascal-string src start))
+    (values pascal (fx+ pend (fx- (fx- n 1) (fxremainder psize n))))))
+
+(define parse-unicode-string : (-> Bytes Fixnum (Values String Fixnum))
   (lambda [src start]
     (define size : Index (parse-uint32 src start index?))
     (cond [(fx= size 0) (values "" size)]
@@ -25,12 +27,13 @@
                       (define next-idx : Fixnum (fx+ src-idx chwidth))
                       (string-set! unicode dest-idx (integer->char (integer-bytes->integer src #false #true src-idx next-idx)))
                       (fill-string! (fx+ dest-idx 1) next-idx)))
-                  (values unicode (assert (fx* size chwidth) index?)))])))
+                  (values unicode (fx+ (fx+ start 4) (fx* size chwidth))))])))
 
 (define parse-keyword : (All (a) (-> Bytes Fixnum Byte (-> Any Boolean : #:+ a) a))
   (lambda [src start size key?]
-    (define key : String (bytes->string/utf-8 src #false start (fx+ start 4)))
-    (assert (string->symbol key) key?)))
+    (define 3chkey? : Boolean (fx= (bytes-ref src (fx+ start 3)) 32))
+    (define key : String (bytes->string/utf-8 src #false start (fx+ start (if 3chkey? 3 4))))
+    (assert (string->symbol (string-downcase key)) key?)))
 
 (define parse-int16 : (All (a) (case-> [Bytes Fixnum -> Fixnum]
                                        [Bytes Fixnum (-> Any Boolean : a) -> a]))
@@ -103,3 +106,11 @@
       (cond [(null? sizes) (reverse dest)]
             [else (let ([next-end (fx+ last-end (car sizes))])
                     (parse next-end (cdr sizes) (cons (cons last-end next-end) dest)))]))))
+
+(define pascal-string : (-> Bytes Fixnum (Values String Fixnum Fixnum))
+  (lambda [src start]
+    (define size : Byte (bytes-ref src start))
+    (define bstart : Fixnum (fx+ start 1))
+    (define bend : Fixnum (fx+ bstart size))
+    ; TODO: Pascal String may not be encoded as UTF-8
+    (values (bytes->string/latin-1 src #false bstart bend) size bend)))

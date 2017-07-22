@@ -24,7 +24,7 @@
 
 (struct PSD PSD-Section ([density : Positive-Real])
   #:transparent
-  #:constructor-name make-psd/but-read-psd-should-be-used-instead
+  #:constructor-name use-read-psd-instead
   #:property prop:convertible
   (λ [[self : PSD] [request : Symbol] [default : Any]]
     (define maybe-bmp : (Option (Instance Bitmap%))
@@ -39,13 +39,12 @@
         (let*-values ([(version channels height width depth color-mode) (read-psd-header /dev/psdin)]
                       [(color-mode-data image-resources layer-info mask-info tagged-blocks) (read-psd-subsection /dev/psdin version)]
                       [(compression-mode image-data) (read-psd-composite-image /dev/psdin)])
-          (make-psd/but-read-psd-should-be-used-instead
-           (integer->version version) channels width height depth color-mode 
-           (make-special-comment color-mode-data) (make-special-comment image-resources)
-           (if layer-info (make-special-comment layer-info) null)
-           (and mask-info (make-special-comment mask-info))
-           (and tagged-blocks (make-special-comment tagged-blocks))
-           compression-mode (make-special-comment image-data) density))
+          (use-read-psd-instead (integer->version version) channels width height depth color-mode 
+                                (make-special-comment color-mode-data) (make-special-comment image-resources)
+                                (if layer-info (make-special-comment layer-info) null)
+                                (and mask-info (make-special-comment mask-info))
+                                (and tagged-blocks (make-special-comment tagged-blocks))
+                                compression-mode (make-special-comment image-data) density))
         (let-values ([(path scale) (select-psd-file /dev/psdin density try-@2x?)])
           (call-with-input-file* path (λ [[psdin : Input-Port]] (read-psd psdin #:backing-scale scale)))))))
 
@@ -96,8 +95,7 @@
                                                        [blocks : (Listof (Pairof Fixnum PSD-Resource-Block)) null])
                   (cond [(and (regexp-match? #px"^8BIM" resource-data start) (index? start))
                          (define id : Fixnum (parse-int16 resource-data (fx+ start 4)))
-                         (define-values (pascal psize) (parse-pascal-string resource-data (fx+ start 6)))
-                         (define size-start : Fixnum (fx+ (fx+ start 8) (fx+ psize (fxremainder psize 2))))
+                         (define-values (pascal size-start) (parse-pascal-string*n resource-data (fx+ start 6) 2))
                          (define data-size : Index (parse-size resource-data size-start 4))
                          (define data-start : Fixnum (fx+ size-start 4))
                          (define raw : Bytes (parse-nbytes resource-data data-start data-size))
@@ -105,6 +103,11 @@
                                      (cons (cons id (cons pascal (make-special-comment raw))) blocks))]
                         [(null? blocks) psd-empty-resources]
                         [else (make-hasheq blocks)]))))))
+
+(define psd-resources* : (-> PSD PSD-Image-Resources)
+  (lambda [self]
+    (psd-resolve-resources self)
+    (psd-resources self)))
 
 (define psd-resource-ref : (-> PSD Integer (Option PSD-Resource))
   ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_38034
@@ -149,8 +152,8 @@
                 (let ([count : Fixnum (parse-int16 layer-info 0)])
                   (define-values (psd/psb-size channel-step) (if (psd-large-document? self) (values 8 10) (values 4 6)))
                   (let parse-layer : (Listof PSD-Layer) ([sreyal : (Listof PSD-Layer) null]
-                                                        [rest : Fixnum (fxabs count)]
-                                                        [idx : Fixnum 2])
+                                                         [rest : Fixnum (fxabs count)]
+                                                         [idx : Fixnum 2])
                     (if (fx> rest 0)
                         (let-values ([(layer next-idx) (parse-layer-record layer-info idx psd/psb-size channel-step)])
                           (parse-layer (cons layer sreyal) (fx- rest 1) next-idx))
