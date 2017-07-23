@@ -2,12 +2,13 @@
 
 (provide (all-defined-out))
 
-(require racket/fixnum)
-
 (require "../layer.rkt")
 (require "../parser.rkt")
 
-(define parse-layer-record : (-> Bytes Fixnum Byte Byte (values PSD-Layer Fixnum))
+(require "metainfo.rkt")
+(require "blocks.rkt")
+
+(define parse-layer-record : (-> Bytes Fixnum Byte Byte (values PSD-Layer-Record Fixnum))
   (lambda [layer-info idx psd/psb-size channel-step]
     (define rectangle : PSD-Layer-Rectangle (parse-rectangle layer-info idx))
     (define channel-count : Index (parse-size layer-info (fx+ idx 16) 2))
@@ -25,16 +26,21 @@
     (define signature : Bytes (parse-nbytes layer-info 8BIM-idx 4))
     (unless (equal? signature #"8BIM")
       (raise-user-error 'psd-layers "not an valid layer record: ~a" signature))
-    (define blend : PSD-Blend-Mode (parse-keyword layer-info (fx+ 8BIM-idx 4) 4 psd-blend-mode?))
-    (define-values (opacity clipping flags total)
+    (define blend : PSD-Blend-Mode (parse-keyword layer-info (fx+ 8BIM-idx 4) psd-blend-mode?))
+    (define-values (opacity base-clipping? flags total)
       (values (parse-uint8 layer-info (fx+ 8BIM-idx 8))
-              (parse-uint8 layer-info (fx+ 8BIM-idx 9))
-              (parse-uint8 layer-info (fx+ 8BIM-idx 10))
+              (fx= (parse-uint8 layer-info (fx+ 8BIM-idx 9)) 0)
+              (layer-flags->symbols (parse-uint8 layer-info (fx+ 8BIM-idx 10)))
               (parse-size layer-info (fx+ 8BIM-idx 12) 4)))
     (define-values (mask range-idx) (parse-layer-mask layer-info (fx+ 8BIM-idx 16)))
     (define-values (blending-ranges name-idx) (parse-layer-blending-ranges layer-info range-idx channel-count))
-    (define-values (name 8B64-idx) (parse-pascal-string*n layer-info name-idx 4))
-    (values (PSD-Layer name rectangle channels blend opacity (fx= clipping 0) (layer-flags->symbols flags) mask blending-ranges)
+    (define-values (pascal-name 8B64-idx) (parse-pascal-string*n layer-info name-idx 4))
+    (define-values (name divider infobase) (parse-8BIM/64s layer-info 8B64-idx psd/psb-size pascal-name psd-layer-default-type))
+    (values (case (PSD-Layer-Section-Divider-type divider)
+              [(1) (PSD-Layer:Open name rectangle channels blend opacity base-clipping? flags mask blending-ranges infobase)]
+              [(2) (PSD-Layer:Closed name rectangle channels blend opacity base-clipping? flags mask blending-ranges infobase)]
+              [(3) (PSD-Layer:Divider name rectangle channels blend opacity base-clipping? flags mask blending-ranges infobase)]
+              [else (PSD-Layer name rectangle channels blend opacity base-clipping? flags mask blending-ranges infobase)])
             (fx+ (fx+ 8BIM-idx 16) total))))
 
 (define parse-layer-mask : (-> Bytes Fixnum (Values (Option PSD-Layer-Mask) Fixnum))
@@ -47,7 +53,7 @@
                        [mask-idx (fx+ idx 22)])
                    (define-values (parameter real-idx)
                      (cond [(bitwise-bit-set? flags 4) (parse-mask-parameter layer-info mask-idx)]
-                           [else (values parameter-placeholder-for-mask mask-idx)]))
+                           [else (values psd-layer-mask-default-parameter mask-idx)]))
                    (if (fx= (fx+ (fx+ idx 4) size) (fx+ real-idx 2))
                        (PSD-Layer-Mask rectangle defcolor (mask-flags->symbols flags) parameter)
                        (PSD-Layer-Real-Mask rectangle defcolor (mask-flags->symbols flags) parameter
@@ -70,7 +76,7 @@
             (fx+ (fx+ idx 4) size))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define parameter-placeholder-for-mask : PSD-Layer-Mask-Parameter (vector #false #false #false #false))
+(define psd-layer-mask-default-parameter : PSD-Layer-Mask-Parameter (vector #false #false #false #false))
 
 (define parse-rectangle : (-> Bytes Fixnum PSD-Layer-Rectangle)
   (lambda [layer-info idx]
@@ -104,6 +110,7 @@
               (parse-uint8 layer-info (fx+ idx 7))))
     (cons source dest)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define layer-flags->symbols : (-> Byte (Listof Symbol))
   (lambda [flag]
     (filter symbol?

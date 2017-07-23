@@ -3,6 +3,7 @@
 ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml
 
 (provide (all-defined-out))
+(provide (all-from-out "integer.rkt"))
 (provide (rename-out [bytes-ref parse-uint8]))
 
 (require "integer.rkt")
@@ -29,11 +30,14 @@
                       (fill-string! (fx+ dest-idx 1) next-idx)))
                   (values unicode (fx+ (fx+ start 4) (fx* size chwidth))))])))
 
-(define parse-keyword : (All (a) (-> Bytes Fixnum Byte (-> Any Boolean : #:+ a) a))
-  (lambda [src start size key?]
-    (define 3chkey? : Boolean (fx= (bytes-ref src (fx+ start 3)) 32))
-    (define key : String (bytes->string/utf-8 src #false start (fx+ start (if 3chkey? 3 4))))
-    (assert (string->symbol (string-downcase key)) key?)))
+(define parse-keyword : (All (a) (case-> [Bytes Fixnum -> Symbol]
+                                         [Bytes Fixnum (-> Any Boolean : #:+ a) -> a]))
+  (case-lambda
+    [(src start key?) (assert (parse-keyword src start) key?)]
+    [(src start)
+     (let ([3chkey? : Boolean (fx= (bytes-ref src (fx+ start 3)) 32)])
+       (define key : String (bytes->string/utf-8 src #false start (fx+ start (if 3chkey? 3 4))))
+       (string->symbol (string-downcase key)))]))
 
 (define parse-int16 : (All (a) (case-> [Bytes Fixnum -> Fixnum]
                                        [Bytes Fixnum (-> Any Boolean : a) -> a]))
@@ -88,16 +92,6 @@
       (subbytes src (car interval) (cdr interval)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-#;(define read-8BIMs : (->* (Integer) (Input-Port) (Listof Bytes))
-  (lambda [smart-size [/dev/psdin (current-input-port)]]
-    (if (regexp-match-peek #px#"^8B(IM|64)" in)
-        (cons (let ([skip-8BIM (read-bytes 4)])
-                (cons (read-bytes 4)
-                      (let ([len (read-integer smart-size)])
-                        (read-bytes len))))
-              (read-8BIMs smart-size in))
-        null)))
-
 (define nbytes-pairs : (-> Fixnum (Listof Index) (Listof (Pairof Integer Integer)))
   (lambda [start bsizes]
     (let parse ([last-end : Fixnum start]

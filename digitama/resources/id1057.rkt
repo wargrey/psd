@@ -2,8 +2,6 @@
 
 (provide 0x421)
 
-(require racket/fixnum)
-
 (require "format.rkt")
 (require "../parser.rkt")
 

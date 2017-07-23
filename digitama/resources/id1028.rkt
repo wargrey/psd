@@ -4,8 +4,6 @@
 
 ;;; Documentation/IPTC/iimv4.pdf
 
-(require racket/fixnum)
-
 (require "format.rkt")
 (require "../parser.rkt")
 (require "../exn.rkt")
