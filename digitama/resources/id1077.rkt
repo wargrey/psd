@@ -4,7 +4,7 @@
 
 (require "format.rkt")
 
-; do not forget update 1007
-(define 0x435 : (-> Integer Bytes String Null PSD-Resource)
-  (lambda [id block name argl]
+; Don't forget to update 1007
+(define 0x435 : (-> Integer String Bytes Fixnum Index Null PSD-Resource)
+  (lambda [id name block idx size argl]
     (PSD-Resource id name)))

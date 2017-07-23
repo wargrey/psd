@@ -21,7 +21,7 @@
    [flags : (Listof Symbol)]
    [mask : (Option PSD-Layer-Mask)]
    [blending-ranges : PSD-Blending-Ranges]
-   [infobase : PSD-Layer-Infobase])
+   [infobase : PSD-Layer-Blocks])
   #:transparent)
 
 (struct PSD-Layer PSD-Layer-Record

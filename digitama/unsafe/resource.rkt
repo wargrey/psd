@@ -10,7 +10,7 @@
 
   (define (psd-resource-parser? func)
     (and (procedure? func)
-         (eq? (procedure-arity func) 4))))
+         (eq? (procedure-arity func) 6))))
 
 (unsafe-require/typed
  (submod "." unsafe)

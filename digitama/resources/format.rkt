@@ -28,7 +28,7 @@
   #:transparent)
 
 (struct PSD-File-Info PSD-Resource    ; 1028 1060
-  ([raw : Bytes])
+  ([raw : Any])
   #:transparent)
 
 (struct PSD-Grid+Guides PSD-Resource  ; 1032

@@ -14,6 +14,7 @@
 
 (require "digitama/layer.rkt")
 (require "digitama/layer/record.rkt")
+(require "digitama/layer/blocks.rkt")
 
 (require "digitama/resource.rkt")
 (require "digitama/resources/format.rkt")
@@ -93,16 +94,14 @@
               (λ [resource-data]
                 (let parse-8BIM : PSD-Image-Resources ([start : Fixnum 0]
                                                        [blocks : (Listof (Pairof Fixnum PSD-Resource-Block)) null])
-                  (cond [(and (regexp-match? #px"^8BIM" resource-data start) (index? start))
-                         (define id : Fixnum (parse-int16 resource-data (fx+ start 4)))
-                         (define-values (pascal size-start) (parse-pascal-string*n resource-data (fx+ start 6) 2))
-                         (define data-size : Index (parse-size resource-data size-start 4))
-                         (define data-start : Fixnum (fx+ size-start 4))
-                         (define raw : Bytes (parse-nbytes resource-data data-start data-size))
-                         (parse-8BIM (fx+ (fx+ data-start data-size) (fxremainder data-size 2))
-                                     (cons (cons id (cons pascal (make-special-comment raw))) blocks))]
-                        [(null? blocks) psd-empty-resources]
-                        [else (make-hasheq blocks)]))))))
+                  (if (regexp-match? #px"^8BIM" resource-data start)
+                      (let ([id (parse-int16 resource-data (fx+ start 4))])
+                        (define-values (pascal size-start) (parse-pascal-string*n resource-data (fx+ start 6) 2))
+                        (define data-size : Index (parse-size resource-data size-start 4))
+                        (define data-start : Fixnum (fx+ size-start 4))
+                        (define block : PSD-Resource-Block (vector pascal (make-special-comment resource-data) data-start data-size))
+                        (parse-8BIM (fx+ (fx+ data-start data-size) (fxremainder data-size 2)) (cons (cons id block) blocks)))
+                      (make-hasheq blocks)))))))
 
 (define psd-resources* : (-> PSD PSD-Image-Resources)
   (lambda [self]
@@ -113,19 +112,20 @@
   ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_38034
   (lambda [self id]
     (define resources : PSD-Image-Resources (psd-resources self))
-    (define maybe-res (hash-ref resources id void))
+    (define maybe-res : (U PSD-Resource-Block PSD-Resource Void) (hash-ref resources id void))
     (or (and (PSD-Resource? maybe-res) maybe-res)
-        (and (pair? maybe-res)
+        (and (vector? maybe-res)
              (psd-parse-resource
               id
               (λ [[parse : PSD-Resource-Parser]]
-                (define-values (name block) (values (car maybe-res) (psd-unbox (cdr maybe-res))))
+                (define-values (name start size) (values (vector-ref maybe-res 0) (vector-ref maybe-res 2) (vector-ref maybe-res 3)))
+                (define block : Bytes (psd-unbox (vector-ref maybe-res 1)))
                 (define resource : (Option PSD-Resource)
                   (with-handlers ([exn:fail? psd-warn-broken-resource])
                     (case id
-                      [(#x040C) (parse id block name (list (PSD-density self)))]
-                      [(#x03EF) (parse id block name (list (hash-has-key? resources #x0435)))]
-                      [else (parse id block name null)])))
+                      [(#x040C) (parse id name block start size (list (PSD-density self)))]
+                      [(#x03EF) (parse id name block start size (list (hash-has-key? resources #x0435)))]
+                      [else (parse id name block start size null)])))
                 (cond [(PSD-Resource? resource) (hash-set! resources id resource)]
                       [(psd-remove-broken-resource?) (hash-remove! resources id)])
                 resource)
@@ -145,15 +145,15 @@
 (define psd-file-info : (-> PSD (Option PSD-File-Info)) (λ [self] (psd-assert (psd-resource-ref self #x424) PSD-File-Info?)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define psd-layers : (-> PSD (Listof PSD-Layer))
+(define psd-layers : (-> PSD (Listof PSD-Layer-Record))
   (lambda [self]
     (psd-ref! self Section-layers
               (λ [layer-info]
                 (let ([count : Fixnum (parse-int16 layer-info 0)])
                   (define-values (psd/psb-size channel-step) (if (psd-large-document? self) (values 8 10) (values 4 6)))
-                  (let parse-layer : (Listof PSD-Layer) ([sreyal : (Listof PSD-Layer) null]
-                                                         [rest : Fixnum (fxabs count)]
-                                                         [idx : Fixnum 2])
+                  (let parse-layer : (Listof PSD-Layer-Record) ([sreyal : (Listof PSD-Layer-Record) null]
+                                                                [rest : Fixnum (fxabs count)]
+                                                                [idx : Fixnum 2])
                     (if (fx> rest 0)
                         (let-values ([(layer next-idx) (parse-layer-record layer-info idx psd/psb-size channel-step)])
                           (parse-layer (cons layer sreyal) (fx- rest 1) next-idx))
@@ -170,6 +170,12 @@
                                        (parse-uint16 mask-info 8))
                                  (integer->mask-opacity (parse-int16 mask-info 10 index?))
                                  (integer->mask-kind (parse-uint8 mask-info 12)))))))
+
+(define psd-tagged-blocks : (-> PSD (Option PSD-Layer-Blocks))
+  (lambda [self]
+    (psd-ref! self Section-tagged-blocks
+              (λ [block-info]
+                (parse-tagged-blocks block-info 0 (if (psd-large-document? self) 8 4))))))
 
 #;(define psd-profile : (->* () (Output-Port) Void)
   (lambda [[out (current-output-port)]]

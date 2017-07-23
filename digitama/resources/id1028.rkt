@@ -8,17 +8,16 @@
 (require "../parser.rkt")
 (require "../exn.rkt")
 
-(define 0x404 : (-> Integer Bytes String Null PSD-File-Info)
-  (lambda [id iptc-naa name argl]
-    (define total : Index (bytes-length iptc-naa))
-    (let parse ([start : Integer 0]
+(define 0x404 : (-> Integer String Bytes Fixnum Index Null PSD-File-Info)
+  (lambda [id name iptc-naa idx size argl]
+    (define max-idx : Fixnum (fx+ idx size))
+    (let parse ([start : Integer idx]
                 [entries : (Listof (Pairof Complex Bytes)) null])
-      (cond [(and (fx< start total) (eq? (bytes-ref iptc-naa start) #x1C #|ASCII Code of File Separator|#))
+      (cond [(and (fx< start max-idx) (eq? (bytes-ref iptc-naa start) #x1C #|ASCII Code of File Separator|#))
              (define-values (record: dataset data-size data) (parse-dataset iptc-naa start))
              (parse (fx+ (fx+ start 5) data-size)
                     (cons (cons (make-rectangular record: dataset) data) entries))]
-            [else (displayln (reverse entries))]))
-    (PSD-File-Info id name iptc-naa)))
+            [else (PSD-File-Info id name (reverse entries))]))))
 
 (define parse-dataset : (-> Bytes Integer (Values Byte Byte Natural Bytes))
   (lambda [iptc-naa start]

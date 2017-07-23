@@ -8,6 +8,10 @@
 
 (require "integer.rkt")
 
+(define parse-boolean : (-> Bytes Fixnum Boolean)
+  (lambda [src start]
+    (fx> (bytes-ref src start) 0)))
+
 (define parse-pascal-string : (-> Bytes Fixnum (Values String Fixnum))
   (lambda [src start]
     (define-values (pascal _size pend) (pascal-string src start))
@@ -103,8 +107,9 @@
 
 (define pascal-string : (-> Bytes Fixnum (Values String Fixnum Fixnum))
   (lambda [src start]
+    ;;; NOTE: Pascal strings are usually useless if they contains not-ASCII code
+    ;;;   in which case there should be Unicode strings stored elsewhere.
     (define size : Byte (bytes-ref src start))
     (define bstart : Fixnum (fx+ start 1))
     (define bend : Fixnum (fx+ bstart size))
-    ; TODO: Pascal String may not be encoded as UTF-8
     (values (bytes->string/latin-1 src #false bstart bend) size bend)))

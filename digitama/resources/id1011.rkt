@@ -5,15 +5,15 @@
 (require "format.rkt")
 (require "../parser.rkt")
 
-(define 0x3f3 : (-> Integer Bytes String Null PSD-Print-Flags)
-  (lambda [id block name args]
+(define 0x3f3 : (-> Integer String Bytes Fixnum Index Null PSD-Resource)
+  (lambda [id name block idx size args]
     (PSD-Print-Flags id name
-                     (> (parse-uint8 block 0) 0)
-                     (> (parse-uint8 block 1) 0)
-                     (> (parse-uint8 block 2) 0)
-                     (> (parse-uint8 block 3) 0)
-                     (> (parse-uint8 block 4) 0)
-                     (> (parse-uint8 block 5) 0)
-                     (> (parse-uint8 block 6) 0)
-                     (> (parse-uint8 block 7) 0)
-                     (> (parse-uint8 block 8) 0))))
+                     (parse-boolean block idx)
+                     (parse-boolean block (fx+ idx 1))
+                     (parse-boolean block (fx+ idx 2))
+                     (parse-boolean block (fx+ idx 3))
+                     (parse-boolean block (fx+ idx 4))
+                     (parse-boolean block (fx+ idx 5))
+                     (parse-boolean block (fx+ idx 6))
+                     (parse-boolean block (fx+ idx 7))
+                     (parse-boolean block (fx+ idx 8)))))

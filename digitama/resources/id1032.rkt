@@ -8,14 +8,14 @@
 (require "../parser.rkt")
 (require "../draw.rkt")
 
-(define 0x408 : (-> Integer Bytes String Null PSD-Grid+Guides)
-  (lambda [id block name argl]
+(define 0x408 : (-> Integer String Bytes Fixnum Index Null PSD-Grid+Guides)
+  (lambda [id name block idx size argl]
     (PSD-Grid+Guides id name
-                     (parse-uint32 block 0) ; version
-                     (parse-uint32 block 4) ; horizontal
-                     (parse-uint32 block 8) ; vertical
-                     (let parse-guide ([fgridcount : Index (parse-size block 12 4)]
-                                       [start : Fixnum 16]
+                     (parse-uint32 block idx) ; version
+                     (parse-uint32 block (fx+ idx 4)) ; horizontal
+                     (parse-uint32 block (fx+ idx 8)) ; vertical
+                     (let parse-guide ([fgridcount : Index (parse-size block (fx+ idx 12) 4)]
+                                       [start : Fixnum (fx+ idx 16)]
                                        [guides : (Listof (Pairof Fixnum PSD-Guide-Direction)) null])
                        (cond [(fx= fgridcount 0) (reverse guides)]
                              [else (parse-guide (fx- fgridcount 1)

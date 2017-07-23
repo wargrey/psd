@@ -7,6 +7,7 @@
 
 (require "metainfo.rkt")
 (require "blocks.rkt")
+(require "lsct.rkt")
 
 (define parse-layer-record : (-> Bytes Fixnum Byte Byte (values PSD-Layer-Record Fixnum))
   (lambda [layer-info idx psd/psb-size channel-step]
@@ -34,8 +35,8 @@
               (parse-size layer-info (fx+ 8BIM-idx 12) 4)))
     (define-values (mask range-idx) (parse-layer-mask layer-info (fx+ 8BIM-idx 16)))
     (define-values (blending-ranges name-idx) (parse-layer-blending-ranges layer-info range-idx channel-count))
-    (define-values (pascal-name 8B64-idx) (parse-pascal-string*n layer-info name-idx 4))
-    (define-values (name divider infobase) (parse-8BIM/64s layer-info 8B64-idx psd/psb-size pascal-name psd-layer-default-type))
+    (define-values (name 8B64-idx) (parse-pascal-string*n layer-info name-idx 4))
+    (define-values (infobase divider) (parse-8BIM/64s layer-info 8B64-idx psd/psb-size psd-layer-default-type))
     (values (case (PSD-Layer-Section-Divider-type divider)
               [(1) (PSD-Layer:Open name rectangle channels blend opacity base-clipping? flags mask blending-ranges infobase)]
               [(2) (PSD-Layer:Closed name rectangle channels blend opacity base-clipping? flags mask blending-ranges infobase)]
@@ -77,6 +78,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define psd-layer-mask-default-parameter : PSD-Layer-Mask-Parameter (vector #false #false #false #false))
+(define psd-layer-default-type : PSD-Layer-Section-Divider (PSD-Layer-Section-Divider 0 #false #false))
 
 (define parse-rectangle : (-> Bytes Fixnum PSD-Layer-Rectangle)
   (lambda [layer-info idx]
@@ -109,6 +111,14 @@
               (parse-uint8 layer-info (fx+ idx 6))
               (parse-uint8 layer-info (fx+ idx 7))))
     (cons source dest)))
+
+(define parse-8BIM/64s : (-> Bytes Fixnum Byte PSD-Layer-Section-Divider (Values PSD-Layer-Blocks PSD-Layer-Section-Divider))
+  (lambda [layer-info idx psd/psb-size default-type]
+    (define infobase : PSD-Layer-Blocks (parse-tagged-blocks layer-info idx psd/psb-size))
+    (define lsct-info : (Option PSD-Layer-Metainfo) (psd-metainfo-remove! infobase 'lsct))
+    (values infobase
+            (cond [(not lsct-info) default-type]
+                  [else (lsct layer-info (PSD-Layer-Metainfo-start lsct-info) (PSD-Layer-Metainfo-size lsct-info))]))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define layer-flags->symbols : (-> Byte (Listof Symbol))
