@@ -5,7 +5,7 @@
 (require "draw.rkt")
 (require "resource.rkt")
 (require "layer.rkt")
-(require "layer/blocks.rkt")
+(require "layer/format.rkt")
 (require "misc.rkt")
 
 (require (for-syntax racket/base))

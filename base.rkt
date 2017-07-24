@@ -12,16 +12,12 @@
 (require "digitama/misc.rkt")
 (require "digitama/exn.rkt")
 
-(require "digitama/layer.rkt")
-(require "digitama/layer/record.rkt")
-(require "digitama/layer/blocks.rkt")
-
 (require "digitama/resource.rkt")
 (require "digitama/resources/format.rkt")
 (require "digitama/unsafe/resource.rkt")
 
 (define psd-remove-broken-resource? : (Parameterof Boolean) (make-parameter #false))
-(define psd-remove-unknown-resource? : (Parameterof Boolean) (make-parameter #true))
+(define psd-remove-unknown-resource? : (Parameterof Boolean) (make-parameter #false))
 
 (struct PSD PSD-Section ([density : Positive-Real])
   #:transparent
@@ -93,14 +89,14 @@
     (psd-ref! self Section-resources
               (λ [resource-data]
                 (let parse-8BIM : PSD-Image-Resources ([start : Fixnum 0]
-                                                       [blocks : (Listof (Pairof Fixnum PSD-Resource-Block)) null])
+                                                       [blocks : (Listof (Pairof Fixnum PSD-Image-Resource-Segment)) null])
                   (if (regexp-match? #px"^8BIM" resource-data start)
                       (let ([id (parse-int16 resource-data (fx+ start 4))])
-                        (define-values (pascal size-start) (parse-pascal-string*n resource-data (fx+ start 6) 2))
-                        (define data-size : Index (parse-size resource-data size-start 4))
-                        (define data-start : Fixnum (fx+ size-start 4))
-                        (define block : PSD-Resource-Block (vector pascal (make-special-comment resource-data) data-start data-size))
-                        (parse-8BIM (fx+ (fx+ data-start data-size) (fxremainder data-size 2)) (cons (cons id block) blocks)))
+                        (define-values (pascal size-idx) (parse-pascal-string*n resource-data (fx+ start 6) 2))
+                        (define segsize : Index (parse-size resource-data size-idx 4))
+                        (define segstart : Fixnum (fx+ size-idx 4))
+                        (define block : PSD-Image-Resource-Segment (vector pascal (make-special-comment resource-data) segstart segsize))
+                        (parse-8BIM (fx+ (fx+ segstart segsize) (fxremainder segsize 2)) (cons (cons id block) blocks)))
                       (make-hasheq blocks)))))))
 
 (define psd-resources* : (-> PSD PSD-Image-Resources)
@@ -112,7 +108,7 @@
   ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_38034
   (lambda [self id]
     (define resources : PSD-Image-Resources (psd-resources self))
-    (define maybe-res : (U PSD-Resource-Block PSD-Resource Void) (hash-ref resources id void))
+    (define maybe-res : (U PSD-Image-Resource-Segment PSD-Resource Void) (hash-ref resources id void))
     (or (and (PSD-Resource? maybe-res) maybe-res)
         (and (vector? maybe-res)
              (psd-parse-resource
@@ -143,57 +139,3 @@
 (define psd-grid+guides : (-> PSD (Option PSD-Grid+Guides)) (λ [self] (psd-assert (psd-resource-ref self #x408) PSD-Grid+Guides?)))
 (define psd-thumbnail : (-> PSD (Option PSD-Thumbnail)) (λ [self] (psd-assert (psd-resource-ref self #x40C) PSD-Thumbnail?)))
 (define psd-file-info : (-> PSD (Option PSD-File-Info)) (λ [self] (psd-assert (psd-resource-ref self #x424) PSD-File-Info?)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define psd-layers : (-> PSD (Listof PSD-Layer-Record))
-  (lambda [self]
-    (psd-ref! self Section-layers
-              (λ [layer-info]
-                (let ([count : Fixnum (parse-int16 layer-info 0)])
-                  (define-values (psd/psb-size channel-step) (if (psd-large-document? self) (values 8 10) (values 4 6)))
-                  (let parse-layer : (Listof PSD-Layer-Record) ([sreyal : (Listof PSD-Layer-Record) null]
-                                                                [rest : Fixnum (fxabs count)]
-                                                                [idx : Fixnum 2])
-                    (if (fx> rest 0)
-                        (let-values ([(layer next-idx) (parse-layer-record layer-info idx psd/psb-size channel-step)])
-                          (parse-layer (cons layer sreyal) (fx- rest 1) next-idx))
-                        (reverse sreyal))))))))
-
-(define psd-global-layer-mask : (-> PSD (Option PSD-Global-Mask))
-  (lambda [self]
-    (psd-ref! self Section-global-mask
-              (λ [mask-info]
-                (PSD-Global-Mask (parse-int16 mask-info 0)
-                                 (list (parse-uint16 mask-info 2)
-                                       (parse-uint16 mask-info 4)
-                                       (parse-uint16 mask-info 6)
-                                       (parse-uint16 mask-info 8))
-                                 (integer->mask-opacity (parse-int16 mask-info 10 index?))
-                                 (integer->mask-kind (parse-uint8 mask-info 12)))))))
-
-(define psd-tagged-blocks : (-> PSD (Option PSD-Layer-Blocks))
-  (lambda [self]
-    (psd-ref! self Section-tagged-blocks
-              (λ [block-info]
-                (parse-tagged-blocks block-info 0 (if (psd-large-document? self) 8 4))))))
-
-#;(define psd-profile : (->* () (Output-Port) Void)
-  (lambda [[out (current-output-port)]]
-    (fprintf out (foldr string-append ""
-                        (add-between (list "~a Object:" "Size: [~a * ~a]" "Channels: ~a" "Depth: ~a" "Color Mode: ~a"
-                                           "Compression Method: ~a" "Resources Count: ~a~a" "Global Mask: ~a" "Tagged Blocks: ~a~a~n")
-                                     "~n    "))
-             (case ~version [{1} 'PSD] [{2} 'PSB]) ~width ~height ~channels ~depth
-             (list-ref '{Bitmap Grayscale Indexed RGB CMYK Multichannel Duotone Lab} ~color-mode)
-             (list-ref '{Raw RLE ZIP-no-prediction ZIP-with-prediction} ~compression)
-             (hash-count image-resources) (hash-keys image-resources)
-             (cond [(zero? (hash-count global-mask)) "None"]
-                   [(= 128 (hash-ref global-mask 'kind)) "Use value stored per layer"]
-                   [else global-mask])
-             (hash-count tagged-blocks) (hash-keys tagged-blocks))
-    
-    (fprintf out "~n    Layer Count: ~a~n" (vector-length layers))
-    (for ([index (in-range (sub1 (vector-length layers)) -1 -1)])
-      (send (vector-ref layers index) folder?)
-      (send (vector-ref layers index) desc "        " out)
-      (newline))))

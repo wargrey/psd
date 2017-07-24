@@ -5,9 +5,8 @@
 (require "../layer.rkt")
 (require "../parser.rkt")
 
-(require "metainfo.rkt")
-(require "blocks.rkt")
-(require "lsct.rkt")
+(require "format.rkt")
+(require "blocks/lsct.rkt")
 
 (define parse-layer-record : (-> Bytes Fixnum Byte Byte (values PSD-Layer-Record Fixnum))
   (lambda [layer-info idx psd/psb-size channel-step]
@@ -36,7 +35,12 @@
     (define-values (mask range-idx) (parse-layer-mask layer-info (fx+ 8BIM-idx 16)))
     (define-values (blending-ranges name-idx) (parse-layer-blending-ranges layer-info range-idx channel-count))
     (define-values (name 8B64-idx) (parse-pascal-string*n layer-info name-idx 4))
-    (define-values (infobase divider) (parse-8BIM/64s layer-info 8B64-idx psd/psb-size psd-layer-default-type))
+    (define infobase : PSD-Layer-Blocks (parse-tagged-blocks layer-info 8B64-idx psd/psb-size))
+    (define divider : PSD-Layer-Section-Divider
+      (let ([lsct-info (hash-ref infobase 'lsct void)])
+        (cond [(not (vector? lsct-info)) psd-layer-default-type]
+              [else (lsct layer-info (vector-ref lsct-info 1) (vector-ref lsct-info 2) null)])))
+    (hash-set! infobase 'lsct divider)
     (values (case (PSD-Layer-Section-Divider-type divider)
               [(1) (PSD-Layer:Open name rectangle channels blend opacity base-clipping? flags mask blending-ranges infobase)]
               [(2) (PSD-Layer:Closed name rectangle channels blend opacity base-clipping? flags mask blending-ranges infobase)]
@@ -76,6 +80,15 @@
                                                       (cons (parse-blending-range layer-info range-idx) segnar))])))
             (fx+ (fx+ idx 4) size))))
 
+(define parse-tagged-blocks : (-> Bytes Fixnum Byte PSD-Layer-Blocks)
+  (lambda [layer-info idx psd/psb-size]
+    (let parse-8BIM ([start : Fixnum idx]
+                     [blocks : (Listof (Pairof Symbol PSD-Layer-Segment)) null])
+      (if (regexp-match? #px"^8B(IM|64)" layer-info start)
+          (let-values ([(key info next) (parse-8B64 layer-info start psd/psb-size)])
+            (parse-8BIM next (cons (cons key info) blocks)))
+          (make-hasheq blocks)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define psd-layer-mask-default-parameter : PSD-Layer-Mask-Parameter (vector #false #false #false #false))
 (define psd-layer-default-type : PSD-Layer-Section-Divider (PSD-Layer-Section-Divider 0 #false #false))
@@ -112,13 +125,16 @@
               (parse-uint8 layer-info (fx+ idx 7))))
     (cons source dest)))
 
-(define parse-8BIM/64s : (-> Bytes Fixnum Byte PSD-Layer-Section-Divider (Values PSD-Layer-Blocks PSD-Layer-Section-Divider))
-  (lambda [layer-info idx psd/psb-size default-type]
-    (define infobase : PSD-Layer-Blocks (parse-tagged-blocks layer-info idx psd/psb-size))
-    (define lsct-info : (Option PSD-Layer-Metainfo) (psd-metainfo-remove! infobase 'lsct))
-    (values infobase
-            (cond [(not lsct-info) default-type]
-                  [else (lsct layer-info (PSD-Layer-Metainfo-start lsct-info) (PSD-Layer-Metainfo-size lsct-info))]))))
+(define parse-8B64 : (-> Bytes Fixnum Byte (Values Symbol PSD-Layer-Segment Fixnum))
+  (lambda [layer-info start psd/psb-size]
+    (define key : Symbol (parse-keyword layer-info (fx+ start 4)))
+    (define ssize : Byte
+      (if (and (fx> psd/psb-size 4)
+               (memq key '(lmsk lr16 lr32 layr mt16 mt32 mtrn alph fmsk lnk2 feid fxid pxsd)))
+          psd/psb-size 4))
+    (define size : Index (parse-size layer-info (fx+ start 8) ssize))
+    (define rstart : Fixnum (fx+ (fx+ start 8) ssize))
+    (values key (vector (make-special-comment layer-info) rstart size) (fx+ rstart size))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define layer-flags->symbols : (-> Byte (Listof Symbol))

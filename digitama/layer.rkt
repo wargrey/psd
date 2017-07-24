@@ -3,7 +3,7 @@
 (provide (all-defined-out))
 
 (require "misc.rkt")
-(require "layer/blocks.rkt")
+(require "layer/format.rkt")
 
 (define-type PSD-Layer-Rectangle (Vector Fixnum Fixnum Index Index))
 (define-type PSD-Layer-Mask-Parameter (Vector (Option Byte) (Option Flonum) (Option Byte) (Option Flonum)))
@@ -21,7 +21,7 @@
    [flags : (Listof Symbol)]
    [mask : (Option PSD-Layer-Mask)]
    [blending-ranges : PSD-Blending-Ranges]
-   [infobase : PSD-Layer-Blocks])
+   [blocks : PSD-Layer-Blocks])
   #:transparent)
 
 (struct PSD-Layer PSD-Layer-Record

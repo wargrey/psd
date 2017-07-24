@@ -34,3 +34,8 @@
   (lambda [e]
     (log-message (current-logger) 'warning 'exn:psd:resource (exn-message e) e)
     #false))
+
+(define psd-warn-broken-information : (-> exn False)
+  (lambda [e]
+    (log-message (current-logger) 'warning 'exn:psd:layer (exn-message e) e)
+    #false))

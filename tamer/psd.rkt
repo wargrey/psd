@@ -1,6 +1,6 @@
 #lang racket
 
-(require "../psd.rkt")
+(require "../main.rkt")
 
 (require racket/runtime-path)
 
