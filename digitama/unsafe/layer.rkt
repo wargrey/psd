@@ -8,17 +8,22 @@
 (module unsafe racket/base
   (provide (all-defined-out))
 
-  (define (psd-layer-block-parser? func)
+  (define (psd-layer-info-parser? func)
     (and (procedure? func)
          (eq? (procedure-arity func) 4))))
 
 (unsafe-require/typed
  (submod "." unsafe)
- [psd-layer-block-parser? (-> Any Boolean : PSD-Layer-Block-Parser)])
+ [psd-layer-info-parser? (-> Any Boolean : PSD-Layer-Info-Parser)])
 
-(define psd-parse-layer-block : (-> Symbol (-> PSD-Layer-Block-Parser (Option PSD-Layer-Block)) (-> Nothing) (Option PSD-Layer-Block))
-  (lambda [key do-with-parser otherwise]
-    (define ~a.rkt : Path (collection-file-path (format "~a.rkt" key) "psd" "digitama" "layer" "blocks"))
-    (define parse-resource (with-handlers ([exn? void]) (dynamic-require ~a.rkt key)))
-    (cond [(psd-layer-block-parser? parse-resource) (do-with-parser parse-resource)]
-          [else (otherwise)])))
+(define psd-layer-info-parse! : (-> PSD-Layer-Infobase Symbol Path-String (-> PSD-Layer-Info-Parser PSD-Layer-Info)
+                                    (-> PSD-Layer-Info) (-> exn:fail Any) (Option PSD-Layer-Info))
+  (lambda [infobase key parser-dir do-with-parser fallback on-error]
+    (define ~a.rkt : Path (build-path parser-dir (format "~a.rkt" key)))
+    (define fffd : Any (with-handlers ([exn? void]) (dynamic-require ~a.rkt key)))
+    (define info : (Option PSD-Layer-Info)
+      (with-handlers ([exn:fail? (λ [[ef : exn:fail]] (and (on-error ef) #false))])
+        (if (psd-layer-info-parser? fffd) (do-with-parser fffd) (fallback))))
+    (cond [(not info) (hash-remove! infobase key)]
+          [else (hash-set! infobase key info)])
+    info))

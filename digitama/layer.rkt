@@ -21,27 +21,7 @@
    [flags : (Listof Symbol)]
    [mask : (Option PSD-Layer-Mask)]
    [blending-ranges : PSD-Blending-Ranges]
-   [blocks : PSD-Layer-Blocks])
-  #:transparent)
-
-(struct PSD-Layer PSD-Layer-Record
-  ()
-  #:transparent)
-
-(struct PSD-Layer:Folder PSD-Layer-Record
-  ()
-  #:transparent)
-
-(struct PSD-Layer:Open PSD-Layer:Folder
-  ()
-  #:transparent)
-
-(struct PSD-Layer:Closed PSD-Layer:Folder
-  ()
-  #:transparent)
-
-(struct PSD-Layer:Divider PSD-Layer-Record
-  ()
+   [infobase : PSD-Layer-Infobase])
   #:transparent)
 
 (struct PSD-Layer-Mask
@@ -63,6 +43,13 @@
    [opacity : PSD-Mask-Opacity]
    [kind : PSD-Mask-Kind])
   #:transparent)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(struct PSD-Layer PSD-Layer-Record () #:transparent)
+(struct PSD-Layer:Folder PSD-Layer-Record () #:transparent)
+(struct PSD-Layer:Open PSD-Layer:Folder () #:transparent)
+(struct PSD-Layer:Closed PSD-Layer:Folder () #:transparent)
+(struct PSD-Layer:Divider PSD-Layer-Record () #:transparent)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define-enumeration* psd-mask-opacity #:+> PSD-Mask-Opacity

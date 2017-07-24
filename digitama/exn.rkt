@@ -30,12 +30,10 @@
             [else (format (string-append idstr ": ~s") args)]))
     (values idstr message)))
 
-(define psd-warn-broken-resource : (-> exn False)
+(define psd-warn-broken-resource : (-> exn Void)
   (lambda [e]
-    (log-message (current-logger) 'warning 'exn:psd:resource (exn-message e) e)
-    #false))
+    (log-message (current-logger) 'warning 'exn:psd (exn-message e) e)))
 
-(define psd-warn-broken-information : (-> exn False)
+(define psd-warn-broken-information : (-> exn Void)
   (lambda [e]
-    (log-message (current-logger) 'warning 'exn:psd:layer (exn-message e) e)
-    #false))
+    (log-message (current-logger) 'warning 'exn:psd (exn-message e) e)))

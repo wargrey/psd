@@ -2,7 +2,7 @@
 
 ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_pgfId-1031423
 
-(provide (all-defined-out))
+(provide (except-out (all-defined-out) psd-infobase-ref))
 
 (require "base.rkt")
 (require "digitama/psd.rkt")
@@ -17,23 +17,24 @@
 (require "digitama/layer/parser.rkt")
 (require "digitama/layer/format.rkt")
 
-(define psd-remove-broken-layer-info? : (Parameterof Boolean) (make-parameter #false))
-(define psd-remove-unknown-layer-info? : (Parameterof Boolean) (make-parameter #false))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define psd-layers : (-> PSD (Listof PSD-Layer-Record))
-  (lambda [self]
-    (psd-ref! self Section-layers
-              (λ [layer-info]
-                (let ([count : Fixnum (parse-int16 layer-info 0)])
-                  (define-values (psd/psb-size channel-step) (if (psd-large-document? self) (values 8 10) (values 4 6)))
-                  (let parse-layer : (Listof PSD-Layer-Record) ([sreyal : (Listof PSD-Layer-Record) null]
-                                                                [rest : Fixnum (fxabs count)]
-                                                                [idx : Fixnum 2])
-                    (if (fx> rest 0)
-                        (let-values ([(layer next-idx) (parse-layer-record layer-info idx psd/psb-size channel-step)])
-                          (parse-layer (cons layer sreyal) (fx- rest 1) next-idx))
-                        (reverse sreyal))))))))
+(define psd-layers : (-> PSD [#:resolve? (U (Listof Symbol) Symbol Boolean)] (Listof PSD-Layer-Record))
+  (lambda [self #:resolve? [keys #false]]
+    (define layers : (Listof PSD-Layer-Record)
+      (psd-ref! self Section-layers
+                (λ [layer-info]
+                  (let ([count : Fixnum (parse-int16 layer-info 0)])
+                    (define-values (psd/psb-size channel-step) (if (psd-large-document? self) (values 8 10) (values 4 6)))
+                    (let parse-layer : (Listof PSD-Layer-Record) ([sreyal : (Listof PSD-Layer-Record) null]
+                                                                  [rest : Fixnum (fxabs count)]
+                                                                  [idx : Fixnum 2])
+                      (if (fx> rest 0)
+                          (let-values ([(layer next-idx) (parse-layer-record layer-info idx psd/psb-size channel-step)])
+                            (parse-layer (cons layer sreyal) (fx- rest 1) next-idx))
+                          (reverse sreyal)))))))
+    (unless (not keys)
+      (for ([layer (in-list layers)])
+        (psd-layer-infobase layer #:resolve? keys)))
+    layers))
 
 (define psd-global-layer-mask : (-> PSD (Option PSD-Global-Mask))
   (lambda [self]
@@ -47,87 +48,57 @@
                                  (integer->mask-opacity (parse-int16 mask-info 10 index?))
                                  (integer->mask-kind (parse-uint8 mask-info 12)))))))
 
-(define psd-tagged-blocks : (-> PSD (Option PSD-Layer-Blocks))
-  (lambda [self]
-    (psd-ref! self Section-tagged-blocks
-              (λ [block-info]
-                (let ([psd/psb-size : Byte (if (psd-large-document? self) 8 4)])
-                  (parse-tagged-blocks block-info 0 psd/psb-size))))))
+(define psd-tagged-blocks : (-> PSD [#:resolve? (U (Listof Symbol) Symbol Boolean)] PSD-Layer-Infobase)
+  (lambda [self #:resolve? [keys #true]]
+    (define infobase : PSD-Layer-Infobase
+      (psd-ref! self Section-tagged-blocks
+                (λ [block-info]
+                  (let ([psd/psb-size : Byte (if (psd-large-document? self) 8 4)])
+                    (parse-tagged-blocks block-info 0 psd/psb-size)))))
+    (unless (not keys)
+      (for ([key (cond [(boolean? keys) (in-list (hash-keys infobase))]
+                       [(symbol? keys) (in-value keys)]
+                       [else (in-list keys)])])
+        (psd-infobase-ref 'psd-tagged-block-ref infobase key)))
+    infobase))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define psd-layers* : (-> PSD (Listof PSD-Layer-Record))
-  (lambda [self]
-    (define layers : (Listof PSD-Layer-Record) (psd-layers self))
-    (for-each psd-layer-resolve-blocks layers)
-    layers))
+;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_71546
 
-(define psd-layer-infobase* : (-> PSD-Layer-Record (Option PSD-Layer-Blocks))
-  (lambda [self]
-    (psd-layer-resolve-blocks self)
-    (PSD-Layer-Record-blocks self)))
+(define psd-layer-infobase : (-> PSD-Layer-Record [#:resolve? (U (Listof Symbol) Symbol Boolean)] PSD-Layer-Infobase)
+  (lambda [self #:resolve? [keys #true]]
+    (define infobase : PSD-Layer-Infobase (PSD-Layer-Record-infobase self))
+    (unless (not keys)
+      (for ([key (cond [(boolean? keys) (in-list (hash-keys infobase))]
+                       [(symbol? keys) (in-value keys)]
+                       [else (in-list keys)])])
+        (psd-infobase-ref 'psd-layer-info-ref infobase key)))
+    infobase))
 
-(define psd-layer-info-ref : (-> PSD-Layer-Record Symbol (Option PSD-Layer-Block))
-  ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_71546
+(define psd-layer-info-ref : (-> PSD-Layer-Record Symbol (Option PSD-Layer-Info))
   (lambda [self key]
-    (define infobase : PSD-Layer-Blocks (PSD-Layer-Record-blocks self))
-    (define maybe-info : (U PSD-Layer-Block PSD-Layer-Segment Void) (hash-ref infobase key void))
-    (or (and (PSD-Layer-Block? maybe-info) maybe-info)
-        (and (vector? maybe-info)
-             (psd-parse-layer-block
-              key
-              (λ [[parse : PSD-Layer-Block-Parser]]
-                (define-values (block start size) (values (vector-ref maybe-info 0) (vector-ref maybe-info 1) (vector-ref maybe-info 2)))
-                (define info : (Option PSD-Layer-Block)
-                  (with-handlers ([exn:fail? psd-warn-broken-information])
-                    (parse (psd-unbox block) start size null)))
-                (cond [(PSD-Layer-Block? info) (hash-set! infobase key info)]
-                      [(psd-remove-broken-layer-info?) (hash-remove! infobase info)])
-                info)
-              (λ []
-                (when (psd-remove-unknown-layer-info?)
-                  (hash-remove! infobase key))
-                (throw-unsupported-error 'psd-layer-info-ref "unimplemeneted layer information: ~a" key)))))))
+    (psd-infobase-ref 'psd-layer-info-ref (PSD-Layer-Record-infobase self) key)))
 
-(define psd-layer-resolve-blocks : (->* (PSD-Layer-Record) ((Listof Symbol)) Void)
-  (lambda [self [keys null]]
-    (define infobase : PSD-Layer-Blocks (PSD-Layer-Record-blocks self))
-    (for ([key (in-list (if (null? keys) (hash-keys infobase) keys))])
-      (with-handlers ([exn? psd-warn-broken-information])
-        (psd-layer-info-ref self key)))))
+(define psd-layer-resolve-infobase : (->* (PSD-Layer-Record) ((U (Listof Symbol) Symbol)) Void)
+  (lambda [self [keys #true]]
+    (void (psd-layer-infobase self #:resolve? keys))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define psd-tagged-blocks* : (-> PSD (Option PSD-Layer-Blocks))
-  (lambda [self]
-    (psd-resolve-tagged-blocks self)
-    (psd-tagged-blocks self)))
-
-(define psd-tagged-block-ref : (-> PSD Symbol (Option PSD-Layer-Block))
-  ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_71546
+(define psd-tagged-block-ref : (-> PSD Symbol (Option PSD-Layer-Info))
   (lambda [self key]
-    (define maybe-infobase : (Option PSD-Layer-Blocks) (psd-tagged-blocks self))
-    (define maybe-info : (U PSD-Layer-Block PSD-Layer-Segment Void False) (and maybe-infobase (hash-ref maybe-infobase key void)))
-    (or (and (PSD-Layer-Block? maybe-info) maybe-info)
-        (and (vector? maybe-info)
-             maybe-infobase
-             (psd-parse-layer-block
-              key
-              (λ [[parse : PSD-Layer-Block-Parser]]
-                (define-values (block start size) (values (vector-ref maybe-info 0) (vector-ref maybe-info 1) (vector-ref maybe-info 2)))
-                (define info : (Option PSD-Layer-Block)
-                  (with-handlers ([exn:fail? psd-warn-broken-information])
-                    (parse (psd-unbox block) start size null)))
-                (cond [(PSD-Layer-Block? info) (hash-set! maybe-infobase key info)]
-                      [(psd-remove-broken-layer-info?) (hash-remove! maybe-infobase info)])
-                info)
-              (λ []
-                (when (psd-remove-unknown-layer-info?)
-                  (hash-remove! maybe-infobase key))
-                (throw-unsupported-error 'psd-tagged-block-ref "unimplemeneted tagged information: ~a" key)))))))
+    (psd-infobase-ref 'psd-tagged-block-ref (psd-tagged-blocks self) key)))
 
-(define psd-resolve-tagged-blocks : (->* (PSD) ((Listof Symbol)) Void)
-  (lambda [self [keys null]]
-    (define maybe-infobase : (Option PSD-Layer-Blocks) (psd-tagged-blocks self))
-    (unless (not maybe-infobase)
-      (for ([key (in-list (if (null? keys) (hash-keys maybe-infobase) keys))])
-        (with-handlers ([exn? psd-warn-broken-information])
-          (psd-tagged-block-ref self key))))))
+(define psd-resolve-tagged-blocks : (->* (PSD) ((U (Listof Symbol) Symbol)) Void)
+  (lambda [self [keys #true]]
+    (void (psd-tagged-blocks self #:resolve? keys))))
+
+(define psd-infobase-ref : (-> Symbol PSD-Layer-Infobase Symbol (Option PSD-Layer-Info))
+  (lambda [src infobase key]
+    (define maybe-info : (U PSD-Layer-Info PSD-Layer-Segment Void False) (and infobase (hash-ref infobase key void)))
+    (or (and (PSD-Layer-Info? maybe-info) maybe-info)
+        (and (vector? maybe-info)
+             (let-values ([(block start size) (values (vector-ref maybe-info 0) (vector-ref maybe-info 1) (vector-ref maybe-info 2))])
+               (psd-layer-info-parse!
+                infobase key /psd/layer/blocks
+                (λ [[parse : PSD-Layer-Info-Parser]] (parse (psd-unbox block) start size null))
+                (λ [] (throw-unsupported-error src "unimplemeneted tagged information: ~a" key))
+                psd-warn-broken-information))))))

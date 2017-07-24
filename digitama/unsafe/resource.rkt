@@ -16,10 +16,15 @@
  (submod "." unsafe)
  [psd-resource-parser? (-> Any Boolean : PSD-Resource-Parser)])
 
-(define psd-parse-resource : (-> Integer (-> PSD-Resource-Parser (Option PSD-Resource)) (-> Nothing) (Option PSD-Resource))
-  (lambda [id do-with-parser otherwise]
-    (define id~a.rkt : Path (collection-file-path (format "id~a.rkt" id) "psd" "digitama" "resources"))
+(define psd-resource-parse! : (-> PSD-Image-Resources Integer Path-String (-> PSD-Resource-Parser PSD-Resource)
+                                  (-> PSD-Resource) (-> exn:fail Any) (Option PSD-Resource))
+  (lambda [resources id parser-dir do-with-parser fallback on-error]
+    (define id~a.rkt : Path (build-path parser-dir (format "id~a.rkt" id)))
     (define parse : Symbol (string->symbol (format "0x~x" id)))
-    (define parse-resource (with-handlers ([exn? void]) (dynamic-require id~a.rkt parse)))
-    (cond [(psd-resource-parser? parse-resource) (do-with-parser parse-resource)]
-          [else (otherwise)])))
+    (define 0xFFFD : Any (with-handlers ([exn? void]) (dynamic-require id~a.rkt parse)))
+    (define resource : (Option PSD-Resource)
+      (with-handlers ([exn:fail? (λ [[ef : exn:fail]] (and (on-error ef) #false))])
+        (if (psd-resource-parser? 0xFFFD) (do-with-parser 0xFFFD) (fallback))))
+    (cond [(not resource) (hash-remove! resources id)]
+          [else (hash-set! resources id resource)])
+    resource))

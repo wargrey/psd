@@ -58,3 +58,6 @@
 (define-enumeration* psd-guide-direction #:+> PSD-Guide-Direction ; order matters
   vhselect->integer integer->vhselect
   [0 vertical horizontal])
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define /psd/resources : Path (collection-file-path "resources" "psd" "digitama"))

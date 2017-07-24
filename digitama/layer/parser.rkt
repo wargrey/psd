@@ -35,7 +35,7 @@
     (define-values (mask range-idx) (parse-layer-mask layer-info (fx+ 8BIM-idx 16)))
     (define-values (blending-ranges name-idx) (parse-layer-blending-ranges layer-info range-idx channel-count))
     (define-values (name 8B64-idx) (parse-pascal-string*n layer-info name-idx 4))
-    (define infobase : PSD-Layer-Blocks (parse-tagged-blocks layer-info 8B64-idx psd/psb-size))
+    (define infobase : PSD-Layer-Infobase (parse-tagged-blocks layer-info 8B64-idx psd/psb-size))
     (define divider : PSD-Layer-Section-Divider
       (let ([lsct-info (hash-ref infobase 'lsct void)])
         (cond [(not (vector? lsct-info)) psd-layer-default-type]
@@ -80,7 +80,7 @@
                                                       (cons (parse-blending-range layer-info range-idx) segnar))])))
             (fx+ (fx+ idx 4) size))))
 
-(define parse-tagged-blocks : (-> Bytes Fixnum Byte PSD-Layer-Blocks)
+(define parse-tagged-blocks : (-> Bytes Fixnum Byte PSD-Layer-Infobase)
   (lambda [layer-info idx psd/psb-size]
     (let parse-8BIM ([start : Fixnum idx]
                      [blocks : (Listof (Pairof Symbol PSD-Layer-Segment)) null])
