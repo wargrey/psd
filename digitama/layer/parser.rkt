@@ -84,7 +84,7 @@
                 [else 4]))
         (define size : Index (parse-size src size-idx ssize))
         (define raw-idx : Fixnum (fx+ size-idx ssize))
-        (values key (vector (make-special-comment src) raw-idx size) (fx+ raw-idx size))))
+        (values key (vector src raw-idx size) (fx+ raw-idx size))))
     (lambda [layer-info idx ps-size]
       (let parse-8BIM ([start : Fixnum idx]
                        [blocks : (Listof (Pairof Symbol PSD-Layer-Segment)) null])

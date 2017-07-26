@@ -2,38 +2,58 @@
 
 (provide (all-defined-out))
 
+(require racket/vector)
+
 (require "base.rkt")
 (require "layer.rkt")
 
-#;(define psd-profile : (->* () (Output-Port) Void)
-  (lambda [[out (current-output-port)]]
-    (fprintf out (foldr string-append ""
-                        (add-between (list "~a Object:" "Size: [~a * ~a]" "Channels: ~a" "Depth: ~a" "Color Mode: ~a"
-                                           "Compression Method: ~a" "Resources Count: ~a~a" "Global Mask: ~a" "Tagged Blocks: ~a~a~n")
-                                     "~n    "))
-             (case ~version [{1} 'PSD] [{2} 'PSB]) ~width ~height ~channels ~depth
-             (list-ref '{Bitmap Grayscale Indexed RGB CMYK Multichannel Duotone Lab} ~color-mode)
-             (list-ref '{Raw RLE ZIP-no-prediction ZIP-with-prediction} ~compression)
-             (hash-count image-resources) (hash-keys image-resources)
-             (cond [(zero? (hash-count global-mask)) "None"]
-                   [(= 128 (hash-ref global-mask 'kind)) "Use value stored per layer"]
-                   [else global-mask])
-             (hash-count tagged-blocks) (hash-keys tagged-blocks))
-    
-    (fprintf out "~n    Layer Count: ~a~n" (vector-length layers))
-    (for ([index (in-range (sub1 (vector-length layers)) -1 -1)])
-      (send (vector-ref layers index) folder?)
-      (send (vector-ref layers index) desc "        " out)
-      (newline))))
+(require "digitama/psd.rkt")
+(require "digitama/resource.rkt")
+(require "digitama/layer.rkt")
 
-#;(define psd-layer-profile : (->* (String) (Output-Port) Void)
-  (lambda [[prefix ""] [out (current-output-port)]]
-    (define frmt (foldr string-append ""
-                        (add-between (list (string-append prefix "Layer Object: ~a") "Rectangle: (~a, ~a, ~a, ~a)" "Channels: ~a"
-                                           "Layer Type: ~a" "Blend: ~a" "Opacity: ~a" "Clipping: ~a" "Flags: #b~b" "Mask/Adjustment: ~a"
-                                           "Additional Info: ~a~a~n")
-                                     (string-append "~n" prefix "    "))))
-    (fprintf out frmt (get-name) top left bottom right (length channels)
-             (list-ref '{"Normal" "Open Folder" "Closed Folder" "Folder Boundary"} (get-type))
-             blend opacity clipping flags mask
-             (hash-count additional-info) (hash-keys additional-info))))
+(define psd-profile : (->* (PSD) (Output-Port #:prefix String) Void)
+  (lambda [self [out (current-output-port)] #:prefix [prefix ""]]
+    (define-values (~t ~t~t) (values (string-append prefix "    ") (string-append prefix "        ")))
+
+    (fprintf out "~a~a Object[~a]:~n" prefix (if (PSD? self) 'PSD 'PSB) (PSD-File-name self))
+    (fprintf out "~aSize: [~a * ~a]~n" ~t (PSD-Header-width self) (PSD-Header-height self))
+    (fprintf out "~aDepth: [~a * ~a]~n" ~t (PSD-Header-depth self) (PSD-Header-channels self))
+    (fprintf out "~aColor Mode: ~a~n" ~t (PSD-Header-color-mode self))
+    (fprintf out "~aCompression Method: ~a~n" ~t (PSD-Header-compression-method self))
+
+    (define resources : PSD-Image-Resources (psd-image-resources self #:resolve? #false))
+    (define mask : (Option PSD-Global-Layer-Mask) (psd-global-layer-mask self))
+    (define infobase : PSD-Layer-Infobase (psd-tagged-blocks self #:resolve? #false))
+    (fprintf out "~aResources: ~a~n" ~t (hash-keys resources))
+    (fprintf out "~aGlobal Mask: ~a~n" ~t (if (not mask) 'None (vector-drop (struct->vector mask) 2)))
+    (fprintf out "~aTagged Blocks: ~a~n" ~t (hash-keys infobase))
+
+    (newline out)
+    (define layers : (Listof PSD-Layer-Object) (psd-layers self))
+    (fprintf out "~aLayer Count: ~a~n" ~t (length layers))
+    (for ([layer (in-list layers)])
+      (psd-layer-profile layer out #:prefix ~t)
+      (newline out))))
+
+(define psd-layer-profile : (->* (PSD-Layer-Object) (Output-Port #:prefix String) Void)
+  (lambda [self [out (current-output-port)] #:prefix [prefix ""]]
+    (define-values (~t ~t~t) (values (string-append prefix "    ") (string-append prefix "        ")))
+
+    (define record : PSD-Layer-Record (PSD-Layer-Object-record self))
+    (define mask : (Option PSD-Layer-Mask) (PSD-Layer-Record-mask record))
+    (fprintf out "~aLayer Object[~a]: '~a'~n" prefix (PSD-Layer-Header-id self) (PSD-Layer-Header-name self))
+    (fprintf out "~aType: ~a~n" ~t (cond [(PSD-Layer:Open? self) "Open Folder"]
+                                         [(PSD-Layer:Closed? self) "Closed Folder"]
+                                         [(PSD-Layer:Divider? self) "Folder Boundary"]
+                                         [else "Normal"]))
+    
+    (fprintf out "~aLocation: (~a, ~a)~n" ~t (PSD-Layer-Record-x record) (PSD-Layer-Record-y record))
+    (fprintf out "~aSize: [~a * ~a]~n" ~t (PSD-Layer-Record-width record) (PSD-Layer-Record-height record))
+    (fprintf out "~aChannels: ~a~n" ~t ((inst map Fixnum (Pairof Fixnum Index)) car (PSD-Layer-Record-channels record)))
+    (fprintf out "~aBlend Mode: ~a~n" ~t (PSD-Layer-Record-blend record))
+    (fprintf out "~aOpacity: ~a~n" ~t (PSD-Layer-Record-opacity record))
+    (fprintf out "~aClipping: ~a~n" ~t (if (PSD-Layer-Record-base-clipping? record) 'base 'nonbase))
+    (fprintf out "~aFlags: ~a~n" ~t (PSD-Layer-Record-flags record))
+    (fprintf out "~aMask: ~a~n" ~t (or mask 'None))
+    (fprintf out "~aCompression Method: ~a~n" ~t (PSD-Layer-Header-compression-method self))
+    (fprintf out "~aAdditional Information: ~a~n" ~t (hash-keys (PSD-Layer-Object-infobase self)))))

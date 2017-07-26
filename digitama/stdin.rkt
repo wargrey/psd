@@ -48,9 +48,9 @@
                   (and (fx> mask-size 0) global-mask-info)
                   (and (fx> tagged-blocks-size 0) (read-nbytes* /dev/psdin tagged-blocks-size)))))))
 
-(define read-psd-composite-image : (-> Input-Port (Values PSD-Compression-Mode Bytes))
+(define read-psd-composite-image : (-> Input-Port (Values PSD-Compression-Method Bytes))
   (lambda [/dev/psdin]
-    (values (integer->compression-mode (read-integer /dev/psdin 2))
+    (values (integer->compression-method (read-integer /dev/psdin 2))
             (port->bytes /dev/psdin))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

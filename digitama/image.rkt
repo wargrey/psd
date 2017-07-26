@@ -8,6 +8,6 @@
   color-mode->integer integer->color-mode
   [0 Bitmap Grayscale Indexed RGB CMYK Multichannel Duotone Lab])
 
-(define-enumeration* psd-compression-mode #:+> PSD-Compression-Mode ; order matters
-  compression-mode->integer integer->compression-mode
+(define-enumeration* psd-compression-method #:+> PSD-Compression-Method ; order matters
+  compression-method->integer integer->compression-method
   [0 Raw RLE ZIP ZIP/prediction])

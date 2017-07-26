@@ -13,7 +13,7 @@
         (psd-layers tamer.psd #:resolve? #true)
         (psd-global-layer-mask tamer.psd)
         tamer.psd
-        (psd-resources tamer.psd #:resolve? #true)))
+        (psd-image-resources tamer.psd #:resolve? #true)))
 
 #;(for/list ([file.psd (in-directory (build-path (find-system-path 'home-dir) "Gyoudmon"))] #:when (psd? file.psd))
   (printf "loading ~a~n" file.psd)

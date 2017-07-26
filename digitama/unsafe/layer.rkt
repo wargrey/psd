@@ -1,9 +1,11 @@
 #lang typed/racket/base
 
-(provide psd-layer-info-parse!)
+(provide psd-layer-info-parse! psd-infobase-ref)
 
 (require typed/racket/unsafe)
+
 (require "../layer/format.rkt")
+(require "../exn.rkt")
 
 (module unsafe racket/base
   (provide (all-defined-out))
@@ -37,3 +39,15 @@
   (lambda [fallback]
     (λ [[bs : Bytes] [idx : Fixnum] [size : Index] [args : (Listof Any)]] : PSD-Layer-Info
       (fallback))))
+
+(define psd-infobase-ref : (-> Symbol PSD-Layer-Infobase Symbol (Option PSD-Layer-Info))
+  (lambda [src infobase key]
+    (define maybe-info : (U PSD-Layer-Info PSD-Layer-Segment Void) (hash-ref infobase key void))
+    (or (and (PSD-Layer-Info? maybe-info) maybe-info)
+        (and (vector? maybe-info)
+             (let-values ([(block start size) (values (vector-ref maybe-info 0) (vector-ref maybe-info 1) (vector-ref maybe-info 2))])
+               (psd-layer-info-parse!
+                infobase key /psd/layer/blocks
+                (λ [[parse : PSD-Layer-Info-Parser]] (parse block start size null))
+                (λ [] (throw-unsupported-error src "unimplemeneted tagged information: ~a" key))
+                psd-warn-broken-information))))))

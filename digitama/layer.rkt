@@ -12,15 +12,17 @@
 (define-type PSD-Blending-Ranges (Pairof (Pairof PSD-Blending-Range PSD-Blending-Range)
                                          (Listof (Pairof PSD-Blending-Range PSD-Blending-Range))))
 
-(struct PSD-Layer-Object
+(struct PSD-Layer-Header
   ([id : (U Integer Symbol)]
    [name : String]
    [has-transparency-data? : Boolean]
-   [record : PSD-Layer-Record]
-   [infobase : PSD-Layer-Infobase]
-   [compression-mode : PSD-Compression-Mode]
-   [image : (U (Instance Bitmap%) PSD-Layer-Segment)])
+   [compression-method : PSD-Compression-Method])
   #:transparent)
+
+(struct PSD-Layer-Object PSD-Layer-Header
+  ([record : PSD-Layer-Record]
+   [infobase : PSD-Layer-Infobase]
+   [image : (U (Instance Bitmap%) PSD-Layer-Segment)]))
 
 (struct PSD-Layer PSD-Layer-Object () #:transparent)
 (struct PSD-Layer:Folder PSD-Layer-Object () #:transparent)
@@ -63,7 +65,7 @@
    [height : Index])
   #:transparent)
 
-(struct PSD-Global-Mask
+(struct PSD-Global-Layer-Mask
   ([overlay-colorspace : Fixnum]
    [colors : (List Index Index Index Index)]
    [opacity : PSD-Mask-Opacity]
@@ -77,7 +79,7 @@
 
 (define-enumeration* psd-mask-kind #:+> PSD-Mask-Kind
   mask-kind->integer integer->mask-kind #:-> Byte
-  [selected 0] [protected 1] [layer-specific 128])
+  [selected 0] [protected 1] [shadowed 128])
 
 (define-enumeration psd-blend-mode : PSD-Blend-Mode
   [pass norm diss dark mul idiv lbrn dkcl lite scrn

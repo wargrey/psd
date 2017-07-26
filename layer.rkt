@@ -2,7 +2,7 @@
 
 ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_pgfId-1031423
 
-(provide (except-out (all-defined-out) psd-infobase-ref))
+(provide (all-defined-out))
 
 (require "base.rkt")
 (require "digitama/image.rkt")
@@ -10,8 +10,6 @@
 (require "digitama/draw.rkt")
 (require "digitama/bitmap.rkt")
 (require "digitama/parser.rkt")
-(require "digitama/misc.rkt")
-(require "digitama/exn.rkt")
 (require "digitama/unsafe/layer.rkt")
 
 (require "digitama/layer.rkt")
@@ -23,7 +21,7 @@
     (define layers : (Listof PSD-Layer-Object)
       (psd-ref! self Section-layers
                 (λ [layer-info]
-                  (let*-values ([(count ps-size) (values (parse-int16 layer-info 0) (PSD-special-size self))]
+                  (let*-values ([(count ps-size) (values (parse-int16 layer-info 0) (PSD-Section-special-size self))]
                                 [(channel-step rle-ssize) (if (fx= ps-size 4) (values 6 2) (values 10 4))])
                     (let parse-layer : (Listof PSD-Layer-Object) ([sdrocer : (Listof PSD-Layer-Record) null]
                                                                   [sesabofni : (Listof PSD-Layer-Infobase) null]
@@ -59,36 +57,34 @@
                                           (define id : (U Index Symbol)
                                             (cond [(not (PSD-Layer-Id? id-info)) (gensym 'psd:layer:)]
                                                   [else (PSD-Layer-Id-data id-info)]))
-                                          (define cmode : Integer (parse-uint16 layer-info previous-end-idx))
-                                          (define segment : PSD-Layer-Segment
-                                            (vector (make-special-comment layer-info) previous-end-idx image-size))
+                                          (define-values (cmethod segment)
+                                            (values (integer->compression-method (parse-uint16 layer-info previous-end-idx))
+                                                    (ann (vector layer-info previous-end-idx image-size) PSD-Layer-Segment)))
                                           (parse-layer-images (cdr records) (cdr infobases) (cdr sizes) previous-end-idx
-                                                              (cons (make-psd-layer id name (fx< count 0) record infobase
-                                                                                    (integer->compression-mode cmode)
-                                                                                    segment)
+                                                              (cons (make-psd-layer id name (fx< count 0) cmethod record infobase segment)
                                                                     layers)))]))))))))
     (unless (not keys)
       (for ([layer (in-list layers)])
         (psd-layer-infobase layer #:resolve? keys)))
     layers))
 
-(define psd-global-layer-mask : (-> PSD (Option PSD-Global-Mask))
+(define psd-global-layer-mask : (-> PSD (Option PSD-Global-Layer-Mask))
   (lambda [self]
     (psd-ref! self Section-global-mask
               (λ [mask-info]
-                (PSD-Global-Mask (parse-int16 mask-info 0)
-                                 (list (parse-uint16 mask-info 2)
-                                       (parse-uint16 mask-info 4)
-                                       (parse-uint16 mask-info 6)
-                                       (parse-uint16 mask-info 8))
-                                 (integer->mask-opacity (parse-int16 mask-info 10 index?))
-                                 (integer->mask-kind (parse-uint8 mask-info 12)))))))
+                (PSD-Global-Layer-Mask (parse-int16 mask-info 0)
+                                       (list (parse-uint16 mask-info 2)
+                                             (parse-uint16 mask-info 4)
+                                             (parse-uint16 mask-info 6)
+                                             (parse-uint16 mask-info 8))
+                                       (integer->mask-opacity (parse-int16 mask-info 10 index?))
+                                       (integer->mask-kind (parse-uint8 mask-info 12)))))))
 
 (define psd-tagged-blocks : (-> PSD [#:resolve? (U (Listof Symbol) Symbol Boolean)] PSD-Layer-Infobase)
   (lambda [self #:resolve? [keys #true]]
     (define infobase : PSD-Layer-Infobase
       (psd-ref! self Section-tagged-blocks
-                (λ [block-info] (let-values ([(infobase end-idx) (parse-tagged-blocks block-info 0 (PSD-special-size self))])
+                (λ [block-info] (let-values ([(infobase end-idx) (parse-tagged-blocks block-info 0 (PSD-Section-special-size self))])
                                   infobase))))
     (unless (not keys)
       (for ([key (cond [(boolean? keys) (in-list (hash-keys infobase))]
@@ -125,15 +121,3 @@
 (define psd-resolve-tagged-blocks : (->* (PSD) ((U (Listof Symbol) Symbol)) Void)
   (lambda [self [keys #true]]
     (void (psd-tagged-blocks self #:resolve? keys))))
-
-(define psd-infobase-ref : (-> Symbol PSD-Layer-Infobase Symbol (Option PSD-Layer-Info))
-  (lambda [src infobase key]
-    (define maybe-info : (U PSD-Layer-Info PSD-Layer-Segment Void) (hash-ref infobase key void))
-    (or (and (PSD-Layer-Info? maybe-info) maybe-info)
-        (and (vector? maybe-info)
-             (let-values ([(block start size) (values (vector-ref maybe-info 0) (vector-ref maybe-info 1) (vector-ref maybe-info 2))])
-               (psd-layer-info-parse!
-                infobase key /psd/layer/blocks
-                (λ [[parse : PSD-Layer-Info-Parser]] (parse (psd-unbox block) start size null))
-                (λ [] (throw-unsupported-error src "unimplemeneted tagged information: ~a" key))
-                psd-warn-broken-information))))))

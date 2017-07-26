@@ -4,7 +4,7 @@
 
 (require typed/racket/unsafe)
 
-(define-type PSD-Layer-Segment (Vector Special-Comment Fixnum Index))
+(define-type PSD-Layer-Segment (Vector Bytes Fixnum Index))
 (define-type PSD-Layer-Infobase (HashTable Symbol (U PSD-Layer-Segment PSD-Layer-Info)))
 (define-type PSD-Layer-Info-Parser (-> Bytes Fixnum Index (Listof Any) PSD-Layer-Info))
 
