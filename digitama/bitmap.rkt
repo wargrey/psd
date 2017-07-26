@@ -2,7 +2,7 @@
 
 (provide (all-defined-out) ~size)
 
-(require "psd.rkt")
+(require "image.rkt")
 (require "draw.rkt")
 (require "parser.rkt")
 (require "packbits.rkt")

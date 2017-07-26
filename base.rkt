@@ -6,6 +6,7 @@
 
 (require "digitama/psd.rkt")
 (require "digitama/draw.rkt")
+(require "digitama/image.rkt")
 (require "digitama/stdin.rkt")
 (require "digitama/bitmap.rkt")
 (require "digitama/parser.rkt")

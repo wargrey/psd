@@ -11,7 +11,7 @@
 (struct PSD-Layer-Info () #:transparent)
 
 (struct PSD-Layer-Id PSD-Layer-Info
-  ([id : Natural])
+  ([data : Index])
   #:transparent)
 
 (struct PSD-Layer-Unicode-Name PSD-Layer-Info

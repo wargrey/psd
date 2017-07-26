@@ -2,6 +2,8 @@
 
 (provide (all-defined-out))
 
+(require "draw.rkt")
+(require "image.rkt")
 (require "misc.rkt")
 (require "layer/format.rkt")
 
@@ -11,10 +13,13 @@
                                          (Listof (Pairof PSD-Blending-Range PSD-Blending-Range))))
 
 (struct PSD-Layer-Object
-  ([id : Index]
+  ([id : (U Integer Symbol)]
    [name : String]
+   [has-transparency-data? : Boolean]
    [record : PSD-Layer-Record]
-   [infobase : PSD-Layer-Infobase])
+   [infobase : PSD-Layer-Infobase]
+   [compression-mode : PSD-Compression-Mode]
+   [image : (U (Instance Bitmap%) PSD-Layer-Segment)])
   #:transparent)
 
 (struct PSD-Layer PSD-Layer-Object () #:transparent)

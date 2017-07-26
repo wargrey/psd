@@ -23,7 +23,7 @@
   (lambda [infobase key parser-dir do-with-parser fallback on-error]
     (define parser : PSD-Layer-Info-Parser
       (hash-ref! psd-layer-info-parsers key
-                 (λ [] (let ([~a.rkt (build-path parser-dir (format "~a.rkt" key))])
+                 (λ [] (let ([~a.rkt (build-path parser-dir (string-append (string-downcase (symbol->string key)) ".rkt"))])
                          (with-handlers ([exn? (λ [[e : exn]] (make-fallback-parser fallback))])
                            (assert (dynamic-require ~a.rkt key) psd-layer-info-parser?))))))
     (define info : (Option PSD-Layer-Info)

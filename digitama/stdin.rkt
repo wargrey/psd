@@ -4,8 +4,8 @@
 
 (require racket/port)
 
-(require "psd.rkt")
 (require "draw.rkt")
+(require "image.rkt")
 
 (define select-psd-file : (-> Path-String Positive-Real Boolean (Values Path-String Positive-Real))
   (lambda [src.psd density try?]

@@ -41,7 +41,7 @@
     [(src start)
      (let ([3chkey? : Boolean (fx= (bytes-ref src (fx+ start 3)) 32)])
        (define key : String (bytes->string/utf-8 src #false start (fx+ start (if 3chkey? 3 4))))
-       (string->symbol (string-downcase key)))]))
+       (string->symbol key))]))
 
 (define parse-int16 : (All (a) (case-> [Bytes Fixnum -> Fixnum]
                                        [Bytes Fixnum (-> Any Boolean : a) -> a]))
