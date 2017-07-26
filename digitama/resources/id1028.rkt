@@ -1,12 +1,12 @@
 #lang typed/racket/base
 
-(provide 0x404)
-
 ;;; Documentation/IPTC/iimv4.pdf
 
 (require "format.rkt")
 (require "../parser.rkt")
 (require "../exn.rkt")
+
+(unsafe-provide 0x404)
 
 (define 0x404 : (-> Integer String Bytes Fixnum Index Null PSD-File-Info)
   (lambda [id name iptc-naa idx size argl]

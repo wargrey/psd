@@ -24,16 +24,15 @@
       (raise-user-error 'read-psd-header "this is not a valid PSD/PSB file: ~a" (object-name /dev/psdin)))
     
     (read-nbytes* /dev/psdin 6) ; reserved
-    (values version
+    (values (if (fx= version 1) 4 8)
             (read-integer /dev/psdin 2 positive-byte?)   ; channels
             (read-integer /dev/psdin 4 positive-index?)  ; height
             (read-integer /dev/psdin 4 positive-index?)  ; width
             (read-integer /dev/psdin 2 positive-byte?)   ; depth
             (integer->color-mode (read-integer /dev/psdin 2)))))
 
-(define read-psd-subsection : (-> Input-Port Byte (Values Bytes Bytes (Option Bytes) (Option Bytes) (Option Bytes)))
-  (lambda [/dev/psdin version]
-    (define psd/psb-size : Positive-Byte (if (fx= version 1) 4 8))
+(define read-psd-subsection : (-> Input-Port Positive-Byte (Values Bytes Bytes (Option Bytes) (Option Bytes) (Option Bytes)))
+  (lambda [/dev/psdin psd/psb-size]
     (define color-mode-data : Bytes (read-n:bytes /dev/psdin 4))
     (define images-resources : Bytes (read-n:bytes /dev/psdin 4))
     (define layer+mask-size : Index (read-integer /dev/psdin psd/psb-size index?))

@@ -1,9 +1,9 @@
 #lang typed/racket/base
 
-(provide 0x421)
-
 (require "format.rkt")
 (require "../parser.rkt")
+
+(unsafe-provide 0x421)
 
 (define 0x421 : (-> Integer String Bytes Fixnum Index Null PSD-Version-Info)
   (lambda [id name iptc-naa idx size argl]

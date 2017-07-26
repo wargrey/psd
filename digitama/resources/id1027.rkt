@@ -1,9 +1,9 @@
 #lang typed/racket/base
 
-(provide 0x403)
-
 (require "format.rkt")
 (require "../exn.rkt")
+
+(unsafe-provide 0x403)
 
 (define 0x403 : (-> Integer String Bytes Fixnum Index Null PSD-Resource)
   (lambda [id name block idx size args]

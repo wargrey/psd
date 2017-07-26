@@ -1,12 +1,10 @@
 #lang typed/racket/base
 
-(provide 0x408)
-
-(require racket/string)
-
 (require "format.rkt")
 (require "../parser.rkt")
 (require "../draw.rkt")
+
+(unsafe-provide 0x408)
 
 (define 0x408 : (-> Integer String Bytes Fixnum Index Null PSD-Grid+Guides)
   (lambda [id name block idx size argl]

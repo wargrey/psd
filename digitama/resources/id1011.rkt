@@ -1,9 +1,9 @@
 #lang typed/racket/base
 
-(provide 0x3f3)
-
 (require "format.rkt")
 (require "../parser.rkt")
+
+(unsafe-provide 0x3f3)
 
 (define 0x3f3 : (-> Integer String Bytes Fixnum Index Null PSD-Resource)
   (lambda [id name block idx size args]

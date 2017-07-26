@@ -1,6 +1,6 @@
 #lang typed/racket/base
 
-(provide (all-defined-out))
+(provide (all-defined-out) PSD-Layer-Infobase)
 
 (require "draw.rkt")
 (require "resource.rkt")
@@ -11,8 +11,7 @@
 (require (for-syntax racket/base))
 
 (struct PSD-Header
-  ([version : PSD-Version]
-   [channels : Positive-Byte]
+  ([channels : Positive-Byte]
    [width : Positive-Index]
    [height : Positive-Index]
    [depth : Positive-Byte]
@@ -22,7 +21,7 @@
 (struct PSD-Section PSD-Header
   ([color-data : Special-Comment]
    [resources : (U PSD-Image-Resources Special-Comment)]
-   [layers : (U Special-Comment (Listof PSD-Layer-Record))]
+   [layers : (U Special-Comment (Listof PSD-Layer-Object))]
    [global-mask : (U PSD-Global-Mask Special-Comment False)]
    [tagged-blocks : (U Special-Comment PSD-Layer-Infobase)]
    [compression-mode : PSD-Compression-Mode]
@@ -30,10 +29,6 @@
   #:transparent #:mutable)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define-enumeration* psd-version #:+> PSD-Version ; order matters
-  version->integer integer->version
-  [1 PSD PSB])
-
 (define-enumeration* psd-color-mode #:+> PSD-Color-Mode ; order matters
   color-mode->integer integer->color-mode
   [0 Bitmap Grayscale Indexed RGB CMYK Multichannel Duotone Lab])

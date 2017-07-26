@@ -1,10 +1,10 @@
 #lang typed/racket/base
 
-(provide 0x40c)
-
 (require "format.rkt")
 (require "../parser.rkt")
 (require "../draw.rkt")
+
+(unsafe-provide 0x40c)
 
 (define 0x40c : (-> Integer String Bytes Fixnum Index (List Positive-Real) PSD-Thumbnail)
   (lambda [id name block idx size argl]

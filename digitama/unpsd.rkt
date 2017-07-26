@@ -2,7 +2,7 @@
 
 ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml
 
-(provide psd%)
+(provide psd% bytes->int)
 
 (require racket/draw)
 (require racket/fixnum)
@@ -10,6 +10,8 @@
 (require images/flomap)
 
 (require "packbits.rkt")
+
+(displayln 'here)
 
 (define {bytes->int bs [signed? #true]}
   (integer-bytes->integer bs signed? #true))

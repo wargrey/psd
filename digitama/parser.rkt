@@ -24,7 +24,7 @@
 
 (define parse-unicode-string : (-> Bytes Fixnum (Values String Fixnum))
   (lambda [src start]
-    (define size : Index (parse-uint32 src start index?))
+    (define size : Index (parse-size src start 4))
     (cond [(fx= size 0) (values "" size)]
           [else (let-values ([(unicode chwidth) (values (make-string size #\null) 2)])
                   (let fill-string! ([dest-idx : Fixnum 0] [src-idx : Fixnum (fx+ start 4)])

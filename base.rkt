@@ -16,9 +16,11 @@
 (require "digitama/resources/format.rkt")
 (require "digitama/unsafe/resource.rkt")
 
-(struct PSD PSD-Section ([density : Positive-Real])
+(struct PSD PSD-Section
+  ([density : Positive-Real]
+   [special-size : Positive-Byte])
   #:transparent
-  #:constructor-name use-read-psd-instead
+  #:constructor-name make-opaque-psd
   #:property prop:convertible
   (λ [[self : PSD] [request : Symbol] [default : Any]]
     (define maybe-bmp : (Option (Instance Bitmap%))
@@ -27,18 +29,22 @@
     (cond [(not maybe-bmp) default]
           [else (convert maybe-bmp request default)])))
 
+(struct PSB PSD () #:transparent #:constructor-name make-opaque-psb)
+
 (define read-psd : (->* ((U Path-String Input-Port)) (#:backing-scale Positive-Real #:try-@2x? Boolean) PSD)
   (lambda [/dev/psdin #:backing-scale [density 1.0] #:try-@2x? [try-@2x? #false]]
     (if (input-port? /dev/psdin)
-        (let*-values ([(version channels height width depth color-mode) (read-psd-header /dev/psdin)]
-                      [(color-mode-data image-resources layer-info mask-info tagged-blocks) (read-psd-subsection /dev/psdin version)]
+        (let*-values ([(ps-size channels height width depth color-mode) (read-psd-header /dev/psdin)]
+                      [(color-mode-data image-resources layer-info mask-info tagged-blocks) (read-psd-subsection /dev/psdin ps-size)]
                       [(compression-mode image-data) (read-psd-composite-image /dev/psdin)])
-          (use-read-psd-instead (integer->version version) channels width height depth color-mode 
-                                (make-special-comment color-mode-data) (make-special-comment image-resources)
-                                (if layer-info (make-special-comment layer-info) null)
-                                (and mask-info (make-special-comment mask-info))
-                                (if tagged-blocks (make-special-comment tagged-blocks) (make-hasheq))
-                                compression-mode (make-special-comment image-data) density))
+          (define make-psd (if (fx= ps-size 4) make-opaque-psd make-opaque-psb))
+          (make-psd channels width height depth color-mode 
+                    (make-special-comment color-mode-data) (make-special-comment image-resources)
+                    (if layer-info (make-special-comment layer-info) null)
+                    (and mask-info (make-special-comment mask-info))
+                    (if tagged-blocks (make-special-comment tagged-blocks) (ann (make-hasheq) PSD-Layer-Infobase))
+                    compression-mode (make-special-comment image-data)
+                    density ps-size))
         (let-values ([(path scale) (select-psd-file /dev/psdin density try-@2x?)])
           (call-with-input-file* path (λ [[psdin : Input-Port]] (read-psd psdin #:backing-scale scale)))))))
 
@@ -47,10 +53,6 @@
     (psd-composite-bitmap (read-psd /dev/psdin #:backing-scale density #:try-@2x? try-@2x?))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define psd-large-document? : (-> PSD Boolean)
-  (lambda [self]
-    (eq? (PSD-Header-version self) 'PSB)))
-
 (define psd-size : (-> PSD (Values Positive-Index Positive-Index))
   (lambda [self]
     (define density : Positive-Real (PSD-density self))
@@ -127,6 +129,7 @@
   (lambda [self [ids #true]]
     (void (psd-resources self #:resolve? ids))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define psd-grid+guides : (-> PSD (Option PSD-Grid+Guides)) (λ [self] (psd-assert (psd-resource-ref self #x408) PSD-Grid+Guides?)))
 (define psd-thumbnail : (-> PSD (Option PSD-Thumbnail)) (λ [self] (psd-assert (psd-resource-ref self #x40C) PSD-Thumbnail?)))
 (define psd-file-info : (-> PSD (Option PSD-File-Info)) (λ [self] (psd-assert (psd-resource-ref self #x424) PSD-File-Info?)))

@@ -5,15 +5,30 @@
 (require "misc.rkt")
 (require "layer/format.rkt")
 
-(define-type PSD-Layer-Rectangle (Vector Fixnum Fixnum Index Index))
 (define-type PSD-Layer-Mask-Parameter (Vector (Option Byte) (Option Flonum) (Option Byte) (Option Flonum)))
 (define-type PSD-Blending-Range (Vector Byte Byte Byte Byte))
 (define-type PSD-Blending-Ranges (Pairof (Pairof PSD-Blending-Range PSD-Blending-Range)
                                          (Listof (Pairof PSD-Blending-Range PSD-Blending-Range))))
 
+(struct PSD-Layer-Object
+  ([id : Index]
+   [name : String]
+   [record : PSD-Layer-Record]
+   [infobase : PSD-Layer-Infobase])
+  #:transparent)
+
+(struct PSD-Layer PSD-Layer-Object () #:transparent)
+(struct PSD-Layer:Folder PSD-Layer-Object () #:transparent)
+(struct PSD-Layer:Open PSD-Layer:Folder () #:transparent)
+(struct PSD-Layer:Closed PSD-Layer:Folder () #:transparent)
+(struct PSD-Layer:Divider PSD-Layer-Object () #:transparent)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (struct PSD-Layer-Record
-  ([name : String]
-   [rectangle : PSD-Layer-Rectangle]
+  ([x : Fixnum]
+   [y : Fixnum]
+   [width : Index]
+   [height : Index]
    [channels : (Listof (Pairof Fixnum Index))]
    [blend : PSD-Blend-Mode]
    [opacity : Byte]
@@ -21,11 +36,14 @@
    [flags : (Listof Symbol)]
    [mask : (Option PSD-Layer-Mask)]
    [blending-ranges : PSD-Blending-Ranges]
-   [infobase : PSD-Layer-Infobase])
+   [name : String])
   #:transparent)
 
 (struct PSD-Layer-Mask
-  ([rectangle : PSD-Layer-Rectangle]
+  ([x : Fixnum]
+   [y : Fixnum]
+   [width : Index]
+   [height : Index]
    [default-color : Byte]
    [flags : (Listof Symbol)]
    [parameter : PSD-Layer-Mask-Parameter])
@@ -34,7 +52,10 @@
 (struct PSD-Layer-Real-Mask PSD-Layer-Mask
   ([flags : (Listof Symbol)]
    [background : Byte]
-   [rectangle : PSD-Layer-Rectangle])
+   [x : Fixnum]
+   [y : Fixnum]
+   [width : Index]
+   [height : Index])
   #:transparent)
 
 (struct PSD-Global-Mask
@@ -43,13 +64,6 @@
    [opacity : PSD-Mask-Opacity]
    [kind : PSD-Mask-Kind])
   #:transparent)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(struct PSD-Layer PSD-Layer-Record () #:transparent)
-(struct PSD-Layer:Folder PSD-Layer-Record () #:transparent)
-(struct PSD-Layer:Open PSD-Layer:Folder () #:transparent)
-(struct PSD-Layer:Closed PSD-Layer:Folder () #:transparent)
-(struct PSD-Layer:Divider PSD-Layer-Record () #:transparent)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define-enumeration* psd-mask-opacity #:+> PSD-Mask-Opacity

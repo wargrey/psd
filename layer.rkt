@@ -17,20 +17,37 @@
 (require "digitama/layer/parser.rkt")
 (require "digitama/layer/format.rkt")
 
-(define psd-layers : (-> PSD [#:resolve? (U (Listof Symbol) Symbol Boolean)] (Listof PSD-Layer-Record))
+(require "digitama/layer/blocks/lsct.rkt")
+
+(define psd-layers : (-> PSD [#:resolve? (U (Listof Symbol) Symbol Boolean)] (Listof PSD-Layer-Object))
   (lambda [self #:resolve? [keys #false]]
-    (define layers : (Listof PSD-Layer-Record)
+    (define layers : (Listof PSD-Layer-Object)
       (psd-ref! self Section-layers
                 (λ [layer-info]
-                  (let ([count : Fixnum (parse-int16 layer-info 0)])
-                    (define-values (psd/psb-size channel-step) (if (psd-large-document? self) (values 8 10) (values 4 6)))
-                    (let parse-layer : (Listof PSD-Layer-Record) ([sreyal : (Listof PSD-Layer-Record) null]
+                  (let* ([count : Fixnum (parse-int16 layer-info 0)]
+                         [ps-size : Positive-Byte (PSD-special-size self)]
+                         [channel-step : Positive-Byte (if (fx= ps-size 4) 6 10)])
+                    (let parse-layer : (Listof PSD-Layer-Object) ([sdrocer : (Listof PSD-Layer-Record) null]
+                                                                  [sesabofni : (Listof PSD-Layer-Infobase) null]
                                                                   [rest : Fixnum (fxabs count)]
                                                                   [idx : Fixnum 2])
                       (if (fx> rest 0)
-                          (let-values ([(layer next-idx) (parse-layer-record layer-info idx psd/psb-size channel-step)])
-                            (parse-layer (cons layer sreyal) (fx- rest 1) next-idx))
-                          (reverse sreyal)))))))
+                          (let-values ([(record infobase next-idx) (parse-layer-record layer-info idx ps-size channel-step)])
+                            (parse-layer (cons record sdrocer) (cons infobase sesabofni) (fx- rest 1) next-idx))
+                          (let parse-layer-images : (Listof PSD-Layer-Object) ([records : (Listof PSD-Layer-Record) sdrocer]
+                                                                               [infobases : (Listof PSD-Layer-Infobase) sesabofni]
+                                                                               [idx : Fixnum idx]
+                                                                               [layers : (Listof PSD-Layer-Object) null])
+                            (cond [(null? records) layers]
+                                  [else (let-values ([(record infobase) (values (car records) (car infobases))])
+                                          (define make-psd-layer ; PSD-Layer-Constructor
+                                            (let ([divider (psd-infobase-ref 'psd-layers infobase 'lsct)])
+                                              (cond [(not (PSD-Layer-Section-Divider? divider)) PSD-Layer]
+                                                    [else (case (PSD-Layer-Section-Divider-type divider)
+                                                            [(1) PSD-Layer:Open] [(2) PSD-Layer:Closed] [(3) PSD-Layer:Divider]
+                                                            [else PSD-Layer])])))
+                                          (parse-layer-images (cdr records) (cdr infobases) idx
+                                                              (cons (make-psd-layer 1 "" record infobase) layers)))]))))))))
     (unless (not keys)
       (for ([layer (in-list layers)])
         (psd-layer-infobase layer #:resolve? keys)))
@@ -52,9 +69,8 @@
   (lambda [self #:resolve? [keys #true]]
     (define infobase : PSD-Layer-Infobase
       (psd-ref! self Section-tagged-blocks
-                (λ [block-info]
-                  (let ([psd/psb-size : Byte (if (psd-large-document? self) 8 4)])
-                    (parse-tagged-blocks block-info 0 psd/psb-size)))))
+                (λ [block-info] (let-values ([(infobase end-idx) (parse-tagged-blocks block-info 0 (PSD-special-size self))])
+                                  infobase))))
     (unless (not keys)
       (for ([key (cond [(boolean? keys) (in-list (hash-keys infobase))]
                        [(symbol? keys) (in-value keys)]
@@ -65,9 +81,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_71546
 
-(define psd-layer-infobase : (-> PSD-Layer-Record [#:resolve? (U (Listof Symbol) Symbol Boolean)] PSD-Layer-Infobase)
+(define psd-layer-infobase : (-> PSD-Layer-Object [#:resolve? (U (Listof Symbol) Symbol Boolean)] PSD-Layer-Infobase)
   (lambda [self #:resolve? [keys #true]]
-    (define infobase : PSD-Layer-Infobase (PSD-Layer-Record-infobase self))
+    (define infobase : PSD-Layer-Infobase (PSD-Layer-Object-infobase self))
     (unless (not keys)
       (for ([key (cond [(boolean? keys) (in-list (hash-keys infobase))]
                        [(symbol? keys) (in-value keys)]
@@ -75,11 +91,11 @@
         (psd-infobase-ref 'psd-layer-info-ref infobase key)))
     infobase))
 
-(define psd-layer-info-ref : (-> PSD-Layer-Record Symbol (Option PSD-Layer-Info))
+(define psd-layer-info-ref : (-> PSD-Layer-Object Symbol (Option PSD-Layer-Info))
   (lambda [self key]
-    (psd-infobase-ref 'psd-layer-info-ref (PSD-Layer-Record-infobase self) key)))
+    (psd-infobase-ref 'psd-layer-info-ref (PSD-Layer-Object-infobase self) key)))
 
-(define psd-layer-resolve-infobase : (->* (PSD-Layer-Record) ((U (Listof Symbol) Symbol)) Void)
+(define psd-layer-resolve-infobase : (->* (PSD-Layer-Object) ((U (Listof Symbol) Symbol)) Void)
   (lambda [self [keys #true]]
     (void (psd-layer-infobase self #:resolve? keys))))
 
@@ -93,7 +109,7 @@
 
 (define psd-infobase-ref : (-> Symbol PSD-Layer-Infobase Symbol (Option PSD-Layer-Info))
   (lambda [src infobase key]
-    (define maybe-info : (U PSD-Layer-Info PSD-Layer-Segment Void False) (and infobase (hash-ref infobase key void)))
+    (define maybe-info : (U PSD-Layer-Info PSD-Layer-Segment Void) (hash-ref infobase key void))
     (or (and (PSD-Layer-Info? maybe-info) maybe-info)
         (and (vector? maybe-info)
              (let-values ([(block start size) (values (vector-ref maybe-info 0) (vector-ref maybe-info 1) (vector-ref maybe-info 2))])
