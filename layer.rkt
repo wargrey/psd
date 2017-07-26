@@ -94,6 +94,17 @@
     infobase))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define psd-layer-location : (-> PSD-Layer-Object (Values Fixnum Fixnum))
+  (lambda [self]
+    (define record : PSD-Layer-Record (PSD-Layer-Object-record self))
+    (values (PSD-Layer-Record-x record) (PSD-Layer-Record-y record))))
+
+(define psd-layer-size : (-> PSD-Layer-Object (Values Fixnum Fixnum))
+  (lambda [self]
+    (define record : PSD-Layer-Record (PSD-Layer-Object-record self))
+    (values (PSD-Layer-Record-width record) (PSD-Layer-Record-width record))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_71546
 
 (define psd-layer-infobase : (-> PSD-Layer-Object [#:resolve? (U (Listof Symbol) Symbol Boolean)] PSD-Layer-Infobase)
