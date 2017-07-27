@@ -13,6 +13,7 @@
   [0 Raw RLE ZIP ZIP/prediction])
 
 (define-enumeration psd-blend-mode : PSD-Blend-Mode
+  ; http://photoblogstop.com/photoshop/photoshop-blend-modes-explained
   [pass norm diss dark mul idiv lbrn dkcl lite scrn
         div lddg lgcl over slit hlit vlit llit plit
         hmix diff smud fsub fdiv hue sat colr lum])

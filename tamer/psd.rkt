@@ -17,7 +17,6 @@
         tamer.psd
         (psd-image-resources tamer.psd #:resolve? #true)))
 
-#;(for/list ([file.psd (in-directory (build-path (find-system-path 'home-dir) "Gyoudmon"))] #:when (psd? file.psd))
-  (printf "loading ~a~n" file.psd)
+#;(for ([file.psd (in-directory (build-path (find-system-path 'home-dir) "Gyoudmon"))] #:when (psd? file.psd))
   (define bitmap.psd (read-psd file.psd #:try-@2x? #true #:backing-scale 2.0))
-  (cons file.psd bitmap.psd))
+  (psd-profile bitmap.psd))

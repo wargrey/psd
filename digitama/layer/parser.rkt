@@ -8,20 +8,20 @@
 (require "../image.rkt")
 (require "format.rkt")
 
-(define parse-layer-record : (-> Bytes Fixnum Positive-Byte Positive-Byte (values PSD-Layer-Record PSD-Layer-Infobase Index Fixnum))
+(define parse-layer-record : (-> Bytes Fixnum Positive-Byte Positive-Byte
+                                 (values PSD-Layer-Record (Listof (Pairof Fixnum Index)) Index PSD-Layer-Infobase Fixnum))
   (lambda [layer-info idx ps-size channel-step]
     (define-values (x y width height) (parse-rectangle layer-info idx))
     (define channel-count : Index (parse-size layer-info (fx+ idx 16) 2))
-    (define-values (channels 8BIM-idx image-data-size)
-      (let cons-info : (Values (Listof (Pairof Fixnum Index)) Fixnum Fixnum)
-        ([channel-No. : Fixnum 0]
-         [channel-start : Fixnum (fx+ idx 18)]
-         [image-data-size : Fixnum 0]
-         [slennahc : (Listof (Pairof Fixnum Index)) null])
-        (cond [(fx= channel-No. channel-count) (values (reverse slennahc) channel-start image-data-size)]
-              [else (let ([channel-id (parse-int16 layer-info channel-start)]
-                          [channel-size (parse-size layer-info (fx+ channel-start 2) ps-size)])
-                      (cons-info (fx+ channel-No. 1) (fx+ channel-start channel-step)
+    (define-values (slennahc image-data-size 8BIM-idx)
+      (let cons-info : (Values (Listof (Pairof Fixnum Index)) Fixnum Fixnum) ([channel-No. : Fixnum 0]
+                                                                              [start-idx : Fixnum (fx+ idx 18)]
+                                                                              [image-data-size : Fixnum 0]
+                                                                              [slennahc : (Listof (Pairof Fixnum Index)) null])
+        (cond [(fx= channel-No. channel-count) (values slennahc image-data-size start-idx)]
+              [else (let ([channel-id (parse-int16 layer-info start-idx)]
+                          [channel-size (parse-size layer-info (fx+ start-idx 2) ps-size)])
+                      (cons-info (fx+ channel-No. 1) (fx+ start-idx channel-step)
                                  (fx+ channel-size image-data-size) (cons (cons channel-id channel-size) slennahc)))])))
     (define signature : Bytes (parse-nbytes layer-info 8BIM-idx 4))
     (unless (equal? signature #"8BIM")
@@ -36,8 +36,8 @@
     (define-values (blending-ranges name-idx) (parse-layer-blending-ranges layer-info range-idx channel-count))
     (define-values (pascal-name 8B64-idx) (parse-pascal-string*n layer-info name-idx 4))
     (define-values (infobase end-idx) (parse-tagged-blocks layer-info 8B64-idx ps-size))
-    (values (PSD-Layer-Record x y width height channels blend opacity base-clipping? flags mask blending-ranges pascal-name)
-            infobase (assert image-data-size index?)
+    (values (PSD-Layer-Record x y width height blend opacity base-clipping? flags mask blending-ranges pascal-name)
+            slennahc (assert image-data-size index?) infobase
             end-idx #;(fx+ (fx+ 8BIM-idx 16) total:mask+|blending-ranges|+|pascal-name|+infobase))))
 
 (define parse-layer-mask : (-> Bytes Fixnum (Values (Option PSD-Layer-Mask) Fixnum))

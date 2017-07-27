@@ -21,25 +21,24 @@
       (psd-ref! self Section-layers
                 (λ [layer-info]
                   (let*-values ([(count ps-size) (values (parse-int16 layer-info 0) (PSD-Section-special-size self))]
-                                [(channel-step rle-ssize) (if (fx= ps-size 4) (values 6 2) (values 10 4))])
+                                [(chstep rle-ssize) (if (fx= ps-size 4) (values 6 2) (values 10 4))])
                     (let parse-layer : (Listof PSD-Layer-Object) ([sdrocer : (Listof PSD-Layer-Record) null]
+                                                                  [tsilhc : (Listof (Listof (Pairof Fixnum Index))) null]
                                                                   [sesabofni : (Listof PSD-Layer-Infobase) null]
-                                                                  [sezis : (Listof Index) null]
                                                                   [rest : Fixnum (fxabs count)]
                                                                   [idx : Fixnum 2]
                                                                   [image-total : Fixnum 0])
                       (if (fx> rest 0)
-                          (let-values ([(record infobase image-size next-idx) (parse-layer-record layer-info idx ps-size channel-step)])
-                            (parse-layer (cons record sdrocer) (cons infobase sesabofni) (cons image-size sezis)
+                          (let-values ([(record slennahc image-size infobase next-idx) (parse-layer-record layer-info idx ps-size chstep)])
+                            (parse-layer (cons record sdrocer) (cons slennahc tsilhc) (cons infobase sesabofni)
                                          (fx- rest 1) next-idx (fx+ image-total image-size)))
-                          (let parse-layer-images : (Listof PSD-Layer-Object) ([records : (Listof PSD-Layer-Record) sdrocer]
-                                                                               [infobases : (Listof PSD-Layer-Infobase) sesabofni]
-                                                                               [sizes : (Listof Index) sezis]
-                                                                               [end-idx : Fixnum (fx+ idx image-total)]
-                                                                               [layers : (Listof PSD-Layer-Object) null])
+                          (let parse-layer-channels ([records : (Listof PSD-Layer-Record) sdrocer]
+                                                     [chlist : (Listof (Listof (Pairof Fixnum Index))) tsilhc]
+                                                     [infobases : (Listof PSD-Layer-Infobase) sesabofni]
+                                                     [end-idx : Fixnum (fx+ idx image-total)]
+                                                     [layers : (Listof PSD-Layer-Object) null])
                             (cond [(null? records) layers]
-                                  [else (let*-values ([(record infobase image-size) (values (car records) (car infobases) (car sizes))]
-                                                      [(previous-end-idx) (fx- end-idx image-size)]
+                                  [else (let*-values ([(record slennahc infobase) (values (car records) (car chlist) (car infobases))]
                                                       [(divider-info) (psd-infobase-ref 'psd-layers infobase 'lsct)]
                                                       [(name-info) (psd-infobase-ref 'psd-layers infobase 'luni)]
                                                       [(id-info) (psd-infobase-ref 'psd-layers infobase 'lyid)])
@@ -56,12 +55,22 @@
                                           (define id : (U Index Symbol)
                                             (cond [(not (PSD-Layer-Id? id-info)) (gensym 'psd:layer:)]
                                                   [else (PSD-Layer-Id-data id-info)]))
-                                          (define-values (cmethod segment)
-                                            (values (integer->compression-method (parse-uint16 layer-info previous-end-idx))
-                                                    (ann (vector layer-info previous-end-idx image-size) PSD-Layer-Segment)))
-                                          (parse-layer-images (cdr records) (cdr infobases) (cdr sizes) previous-end-idx
-                                                              (cons (make-psd-layer id name (fx< count 0) cmethod record infobase segment)
-                                                                    layers)))]))))))))
+                                          (define-values (channels previous-end-idx)
+                                            (let parse-layer-channel : (Values (Listof PSD-Layer-Channel) Fixnum)
+                                              ([slennahc : (Listof (Pairof Fixnum Index)) slennahc]
+                                               [previous-end-idx : Fixnum end-idx]
+                                               [channels : (Listof PSD-Layer-Channel) null])
+                                              (cond [(null? slennahc) (values channels previous-end-idx)]
+                                                    [else (let* ([chsize (cdar slennahc)]
+                                                                 [chidx (fx- previous-end-idx chsize)]
+                                                                 [cmethod (integer->compression-method (parse-uint16 layer-info chidx))]
+                                                                 [channel (list (caar slennahc) cmethod (fx+ chidx 2) (fx- chsize 2))])
+                                                            (parse-layer-channel (cdr slennahc) chidx
+                                                                                 (cons (ann channel PSD-Layer-Channel) channels)))])))
+                                          (parse-layer-channels (cdr records) (cdr chlist) (cdr infobases) previous-end-idx
+                                                                (cons (make-psd-layer id name channels (fx< count 0)
+                                                                                      record infobase layer-info)
+                                                                      layers)))]))))))))
     (unless (not keys)
       (for ([layer (in-list layers)])
         (psd-layer-infobase layer #:resolve? keys)))

@@ -8,6 +8,7 @@
 (require "layer/format.rkt")
 
 (define-type PSD-Layer-Mask-Parameter (Vector (Option Byte) (Option Flonum) (Option Byte) (Option Flonum)))
+(define-type PSD-Layer-Channel (List Fixnum PSD-Compression-Method Fixnum Fixnum))
 (define-type PSD-Blending-Range (Vector Byte Byte Byte Byte))
 (define-type PSD-Blending-Ranges (Pairof (Pairof PSD-Blending-Range PSD-Blending-Range)
                                          (Listof (Pairof PSD-Blending-Range PSD-Blending-Range))))
@@ -15,14 +16,14 @@
 (struct PSD-Layer-Header
   ([id : (U Integer Symbol)]
    [name : String]
-   [has-transparency-data? : Boolean]
-   [compression-method : PSD-Compression-Method])
+   [channels : (Listof PSD-Layer-Channel)]
+   [has-transparency-data? : Boolean])
   #:transparent)
 
 (struct PSD-Layer-Object PSD-Layer-Header
   ([record : PSD-Layer-Record]
    [infobase : PSD-Layer-Infobase]
-   [image : (U (Instance Bitmap%) PSD-Layer-Segment)]))
+   [image : (U (Instance Bitmap%) Bytes)]))
 
 (struct PSD-Layer PSD-Layer-Object () #:transparent)
 (struct PSD-Layer:Folder PSD-Layer-Object () #:transparent)
@@ -36,7 +37,6 @@
    [y : Fixnum]
    [width : Index]
    [height : Index]
-   [channels : (Listof (Pairof Fixnum Index))]
    [blend : PSD-Blend-Mode]
    [opacity : Byte]
    [base-clipping? : Boolean]
