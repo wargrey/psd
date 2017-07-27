@@ -21,7 +21,8 @@
       (psd-ref! self Section-layers
                 (λ [layer-info]
                   (let*-values ([(count ps-size) (values (parse-int16 layer-info 0) (PSD-Section-special-size self))]
-                                [(chstep rle-ssize) (if (fx= ps-size 4) (values 6 2) (values 10 4))])
+                                [(chstep rle-ssize) (if (fx= ps-size 4) (values 6 2) (values 10 4))]
+                                [(density color-mode) (values (PSD-File-density self) (PSD-Header-color-mode self))])
                     (let parse-layer : (Listof PSD-Layer-Object) ([sdrocer : (Listof PSD-Layer-Record) null]
                                                                   [tsilhc : (Listof (Listof (Pairof Fixnum Index))) null]
                                                                   [sesabofni : (Listof PSD-Layer-Infobase) null]
@@ -69,7 +70,7 @@
                                                                                  (cons (ann channel PSD-Layer-Channel) channels)))])))
                                           (parse-layer-channels (cdr records) (cdr chlist) (cdr infobases) previous-end-idx
                                                                 (cons (make-psd-layer id name channels (fx< count 0)
-                                                                                      record infobase layer-info)
+                                                                                      record infobase layer-info color-mode density)
                                                                       layers)))]))))))))
     (unless (not keys)
       (for ([layer (in-list layers)])

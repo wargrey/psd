@@ -23,7 +23,9 @@
 (struct PSD-Layer-Object PSD-Layer-Header
   ([record : PSD-Layer-Record]
    [infobase : PSD-Layer-Infobase]
-   [image : (U (Instance Bitmap%) Bytes)]))
+   [image : (U (Instance Bitmap%) Bytes)]
+   [color-mode : PSD-Color-Mode]
+   [density : Positive-Real]))
 
 (struct PSD-Layer PSD-Layer-Object () #:transparent)
 (struct PSD-Layer:Folder PSD-Layer-Object () #:transparent)
