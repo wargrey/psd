@@ -1,6 +1,6 @@
 #lang typed/racket/base
 
-(require "../digitama/packbits.rkt")
+(require "../village/packbits.rkt")
 
 (require typed/rackunit)
 (require typed/rackunit/text-ui)
