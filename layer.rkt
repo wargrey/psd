@@ -8,7 +8,6 @@
 (require "digitama/image.rkt")
 (require "digitama/psd.rkt")
 (require "digitama/draw.rkt")
-(require "digitama/bitmap.rkt")
 (require "digitama/parser.rkt")
 (require "digitama/unsafe/layer.rkt")
 

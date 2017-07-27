@@ -80,8 +80,3 @@
 (define-enumeration* psd-mask-kind #:+> PSD-Mask-Kind
   mask-kind->integer integer->mask-kind #:-> Byte
   [selected 0] [protected 1] [shadowed 128])
-
-(define-enumeration psd-blend-mode : PSD-Blend-Mode
-  [pass norm diss dark mul idiv lbrn dkcl lite scrn
-        div lddg lgcl over slit hlit vlit llit plit
-        hmix diff smud fsub fdiv hue sat colr lum])

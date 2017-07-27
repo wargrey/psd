@@ -5,6 +5,7 @@
 (require "../layer.rkt")
 (require "../parser.rkt")
 (require "../exn.rkt")
+(require "../image.rkt")
 (require "format.rkt")
 
 (define parse-layer-record : (-> Bytes Fixnum Positive-Byte Positive-Byte (values PSD-Layer-Record PSD-Layer-Infobase Index Fixnum))

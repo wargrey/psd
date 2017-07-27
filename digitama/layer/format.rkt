@@ -4,6 +4,8 @@
 
 (require typed/racket/unsafe)
 
+(require "../image.rkt")
+
 (define-type PSD-Layer-Segment (Vector Bytes Fixnum Index))
 (define-type PSD-Layer-Infobase (HashTable Symbol (U PSD-Layer-Segment PSD-Layer-Info)))
 (define-type PSD-Layer-Info-Parser (-> Bytes Fixnum Index (Listof Any) PSD-Layer-Info))
@@ -24,7 +26,7 @@
 
 (struct PSD-Layer-Section-Divider PSD-Layer-Info
   ([type : Integer]
-   [blend-mode : (Option Symbol)]
+   [blend-mode : (Option PSD-Blend-Mode)]
    [subtype : (Option Integer)])
   #:transparent)
 

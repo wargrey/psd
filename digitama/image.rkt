@@ -11,3 +11,8 @@
 (define-enumeration* psd-compression-method #:+> PSD-Compression-Method ; order matters
   compression-method->integer integer->compression-method
   [0 Raw RLE ZIP ZIP/prediction])
+
+(define-enumeration psd-blend-mode : PSD-Blend-Mode
+  [pass norm diss dark mul idiv lbrn dkcl lite scrn
+        div lddg lgcl over slit hlit vlit llit plit
+        hmix diff smud fsub fdiv hue sat colr lum])

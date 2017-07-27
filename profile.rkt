@@ -29,18 +29,17 @@
     (fprintf out "~aResources: ~a~n" ~t (hash-keys resources))
     (fprintf out "~aLayer Count: ~a~n" ~t (length layers))
     (fprintf out "~aGlobal Mask: ~a~n" ~t (if (not mask) 'None (vector-drop (struct->vector mask) 2)))
-    (fprintf out "~aTagged Blocks: ~a~n" ~t (hash-keys infobase))
+    (fprintf out "~aTagged Blocks: ~a~n~n" ~t (hash-keys infobase))
     
     (unless (not full?)
-      (newline out)
       (for ([layer (in-list layers)])
-        (psd-layer-profile layer out #:prefix ~t)
-        (newline out)))))
+        (psd-layer-profile layer out #:prefix ~t)))))
 
 (define psd-layer-profile : (->* (PSD-Layer-Object) (Output-Port #:prefix String) Void)
   (lambda [self [out (current-output-port)] #:prefix [prefix ""]]
     (define-values (~t ~t~t) (values (string-append prefix "    ") (string-append prefix "        ")))
 
+    (define +/- : Symbol (if (PSD-Layer-Header-has-transparency-data? self) '- '+))
     (define record : PSD-Layer-Record (PSD-Layer-Object-record self))
     (define mask : (Option PSD-Layer-Mask) (PSD-Layer-Record-mask record))
     (fprintf out "~aLayer Object[~a]: '~a'~n" prefix (PSD-Layer-Header-id self) (PSD-Layer-Header-name self))
@@ -51,11 +50,11 @@
     
     (fprintf out "~aLocation: (~a, ~a)~n" ~t (PSD-Layer-Record-x record) (PSD-Layer-Record-y record))
     (fprintf out "~aSize: [~a * ~a]~n" ~t (PSD-Layer-Record-width record) (PSD-Layer-Record-height record))
-    (fprintf out "~aChannels: ~a~n" ~t ((inst map Fixnum (Pairof Fixnum Index)) car (PSD-Layer-Record-channels record)))
+    (fprintf out "~aChannels: ~a~a~n" ~t +/- ((inst map Fixnum (Pairof Fixnum Index)) car (PSD-Layer-Record-channels record)))
     (fprintf out "~aBlend Mode: ~a~n" ~t (PSD-Layer-Record-blend record))
     (fprintf out "~aOpacity: ~a~n" ~t (PSD-Layer-Record-opacity record))
     (fprintf out "~aClipping: ~a~n" ~t (if (PSD-Layer-Record-base-clipping? record) 'base 'nonbase))
     (fprintf out "~aFlags: ~a~n" ~t (PSD-Layer-Record-flags record))
     (fprintf out "~aMask: ~a~n" ~t (or mask 'None))
     (fprintf out "~aCompression Method: ~a~n" ~t (PSD-Layer-Header-compression-method self))
-    (fprintf out "~aAdditional Information: ~a~n" ~t (hash-keys (PSD-Layer-Object-infobase self)))))
+    (fprintf out "~aAdditional Information: ~a~n~n" ~t (hash-keys (PSD-Layer-Object-infobase self)))))
