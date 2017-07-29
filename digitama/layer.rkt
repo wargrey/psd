@@ -13,16 +13,16 @@
 (define-type PSD-Blending-Ranges (Pairof (Pairof PSD-Blending-Range PSD-Blending-Range)
                                          (Listof (Pairof PSD-Blending-Range PSD-Blending-Range))))
 
-(struct PSD-Layer-Header
-  ([id : (U Integer Symbol)]
+(struct PSD-Layer-Subject
+  ([id : (U Index Symbol)]
    [name : String]
    [channels : (Listof PSD-Layer-Channel)]
-   [has-transparency-data? : Boolean])
+   [has-transparency-data? : Boolean]
+   [record : PSD-Layer-Record])
   #:transparent)
 
-(struct PSD-Layer-Object PSD-Layer-Header
-  ([record : PSD-Layer-Record]
-   [infobase : PSD-Layer-Infobase]
+(struct PSD-Layer-Object PSD-Layer-Subject
+  ([infobase : PSD-Layer-Infobase]
    [image : (U (Instance Bitmap%) Bytes)]
    [color-mode : PSD-Color-Mode]
    [density : Positive-Real]))

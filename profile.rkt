@@ -39,10 +39,10 @@
   (lambda [self [out (current-output-port)] #:prefix [prefix ""]]
     (define-values (~t ~t~t) (values (string-append prefix "    ") (string-append prefix "        ")))
 
-    (define +/- : Symbol (if (PSD-Layer-Header-has-transparency-data? self) '- '+))
-    (define record : PSD-Layer-Record (PSD-Layer-Object-record self))
+    (define +/- : Symbol (if (PSD-Layer-Subject-has-transparency-data? self) '- '+))
+    (define record : PSD-Layer-Record (PSD-Layer-Subject-record self))
     (define mask : (Option PSD-Layer-Mask) (PSD-Layer-Record-mask record))
-    (fprintf out "~aLayer Object[~a]: '~a'~n" prefix (PSD-Layer-Header-id self) (PSD-Layer-Header-name self))
+    (fprintf out "~aLayer Object[~a]: '~a'~n" prefix (PSD-Layer-Subject-id self) (PSD-Layer-Subject-name self))
     (fprintf out "~aType: ~a~n" ~t (cond [(PSD-Layer:Open? self) "Open Folder"]
                                          [(PSD-Layer:Closed? self) "Closed Folder"]
                                          [(PSD-Layer:Divider? self) "Folder Boundary"]
@@ -50,7 +50,7 @@
     
     (fprintf out "~aLocation: (~a, ~a)~n" ~t (PSD-Layer-Record-x record) (PSD-Layer-Record-y record))
     (fprintf out "~aSize: [~a * ~a]~n" ~t (PSD-Layer-Record-width record) (PSD-Layer-Record-height record))
-    (fprintf out "~aChannels: ~a~a~n" ~t +/- (for/list ([ch (in-list (PSD-Layer-Header-channels self))]) (cons (car ch) (cadr ch))))
+    (fprintf out "~aChannels: ~a~a~n" ~t +/- (for/list ([ch (in-list (PSD-Layer-Subject-channels self))]) (cons (car ch) (cadr ch))))
     (fprintf out "~aBlend Mode: ~a~n" ~t (PSD-Layer-Record-blend record))
     (fprintf out "~aOpacity: ~a~n" ~t (PSD-Layer-Record-opacity record))
     (fprintf out "~aClipping: ~a~n" ~t (if (PSD-Layer-Record-base-clipping? record) 'base 'nonbase))

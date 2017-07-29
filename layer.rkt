@@ -14,6 +14,7 @@
 (require "digitama/layer.rkt")
 (require "digitama/layer/parser.rkt")
 (require "digitama/layer/format.rkt")
+(require "digitama/layer/bitmap.rkt")
 
 (define psd-layers : (-> PSD [#:resolve? (U (Listof Symbol) Symbol Boolean)] (Listof PSD-Layer-Object))
   (lambda [self #:resolve? [keys #false]]
@@ -105,13 +106,22 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define psd-layer-location : (-> PSD-Layer-Object (Values Fixnum Fixnum))
   (lambda [self]
-    (define record : PSD-Layer-Record (PSD-Layer-Object-record self))
+    (define record : PSD-Layer-Record (PSD-Layer-Subject-record self))
     (values (PSD-Layer-Record-x record) (PSD-Layer-Record-y record))))
 
 (define psd-layer-size : (-> PSD-Layer-Object (Values Fixnum Fixnum))
   (lambda [self]
-    (define record : PSD-Layer-Record (PSD-Layer-Object-record self))
+    (define record : PSD-Layer-Record (PSD-Layer-Subject-record self))
     (values (PSD-Layer-Record-width record) (PSD-Layer-Record-width record))))
+
+#;(define psd-layer-composite-bitmap : (-> PSD-Layer-Object (Instance Bitmap%))
+  (lambda [self]
+    (psd-ref! self Layer-Object-image
+              (λ [image-data]
+                (psd-layer-image-data->bitmap 'psd-layer-composite-bitmap image-data (PSD-Header-color-mode self)
+                                              (PSD-Header-width self) (PSD-Header-height self)
+                                              (PSD-Header-channels self) (PSD-Header-depth self)
+                                              (PSD-Header-compression-method self) (PSD-File-density self))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; http://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_71546

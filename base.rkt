@@ -66,7 +66,7 @@
   (lambda [self]
     (psd-ref! self Section-image
               (λ [image-data]
-                (psd-image-data->bitmap 'psd->bitmap image-data (PSD-Header-color-mode self)
+                (psd-image-data->bitmap 'psd-composite-bitmap image-data (PSD-Header-color-mode self)
                                         (PSD-Header-width self) (PSD-Header-height self)
                                         (PSD-Header-channels self) (PSD-Header-depth self)
                                         (PSD-Header-compression-method self) (PSD-File-density self))))))
