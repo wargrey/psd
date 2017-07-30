@@ -11,7 +11,7 @@
 
 (define throw-obsolete-error : (-> Integer Any * Nothing)
   (lambda [id . args]
-    (define-values (idstr message) (values id args))
+    (define-values (idstr message) (psd-args->message id args))
     (raise (make-exn:fail:unsupported (format "obsolete resource: ~a" message)
                                       (continuation-marks #false)))))
 
