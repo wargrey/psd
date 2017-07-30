@@ -19,7 +19,7 @@
     (fprintf out "~aSize: [~a * ~a]~n" ~t (PSD-Header-width self) (PSD-Header-height self))
     (fprintf out "~aDepth: [~a * ~a]~n" ~t (PSD-Header-depth self) (PSD-Header-channels self))
     (fprintf out "~aColor Mode: ~a~n" ~t (PSD-Header-color-mode self))
-    (fprintf out "~aCompression Method: ~a~n" ~t (PSD-Header-compression-method self))
+    (fprintf out "~aCompression Method: ~a~n" ~t (PSD-Section-compression-method self))
 
     (define resources : PSD-Image-Resources (psd-image-resources self #:resolve? resolve?))
     (define layers : (Listof PSD-Layer-Object) (psd-layers self))
@@ -28,8 +28,11 @@
     
     (fprintf out "~aResources: ~a~n" ~t (hash-keys resources))
     (fprintf out "~aLayer Count: ~a~n" ~t (length layers))
-    (fprintf out "~aGlobal Mask: ~a~n" ~t (if (not mask) 'None (vector-drop (struct->vector mask) 2)))
-    (fprintf out "~aTagged Blocks: ~a~n~n" ~t (hash-keys infobase))
+
+    (cond [(null? layers) (newline out)]
+          [else (fprintf out "~aGlobal Layer Mask: ~a~n~aTagged Blocks: ~a~n~n"
+                         ~t (if (not mask) 'None (vector-drop (struct->vector mask) 2))
+                         ~t (hash-keys infobase))])
     
     (unless (not full?)
       (for ([layer (in-list layers)])
@@ -49,12 +52,12 @@
                                          [else "Normal"]))
 
     (unless (not resolve?) (psd-layer-resolve-infobase self))
-    (fprintf out "~aLocation: (~a, ~a)~n" ~t (PSD-Layer-Record-x record) (PSD-Layer-Record-y record))
-    (fprintf out "~aSize: [~a * ~a]~n" ~t (PSD-Layer-Record-width record) (PSD-Layer-Record-height record))
+    (fprintf out "~aLocation: (~a, ~a)~n" ~t (PSD-Layer-Header-x record) (PSD-Layer-Header-y record))
+    (fprintf out "~aSize: [~a * ~a]~n" ~t (PSD-Layer-Header-width record) (PSD-Layer-Header-height record))
     (fprintf out "~aChannels: ~a~a~n" ~t +/- (for/list ([ch (in-list (PSD-Layer-Subject-channels self))]) (cons (car ch) (cadr ch))))
-    (fprintf out "~aBlend Mode: ~a~n" ~t (PSD-Layer-Record-blend record))
-    (fprintf out "~aOpacity: ~a~n" ~t (PSD-Layer-Record-opacity record))
-    (fprintf out "~aClipping: ~a~n" ~t (if (zero? (PSD-Layer-Record-clipping record)) 'base 'nonbase))
-    (fprintf out "~aFlags: ~a~n" ~t (PSD-Layer-Record-flags record))
+    (fprintf out "~aBlend Mode: ~a~n" ~t (PSD-Layer-Header-blend record))
+    (fprintf out "~aOpacity: ~a~n" ~t (PSD-Layer-Header-opacity record))
+    (fprintf out "~aClipping: ~a~n" ~t (if (zero? (PSD-Layer-Header-clipping record)) 'base 'nonbase))
+    (fprintf out "~aFlags: ~a~n" ~t (PSD-Layer-Header-flags record))
     (fprintf out "~aMask: ~a~n" ~t (or mask 'None))
     (fprintf out "~aAdditional Information: ~a~n~n" ~t (hash-keys (PSD-Layer-Object-infobase self)))))

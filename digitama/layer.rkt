@@ -15,7 +15,7 @@
 
 (struct PSD-Layer-Subject
   ([id : (U Index Symbol)]
-   [name : String]
+   [name : String] ; unicode name
    [channels : (Listof PSD-Layer-Channel)]
    [has-transparency-data? : Boolean]
    [record : PSD-Layer-Record])
@@ -34,7 +34,7 @@
 (struct PSD-Layer:Divider PSD-Layer-Object () #:transparent)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(struct PSD-Layer-Record
+(struct PSD-Layer-Header
   ([x : Fixnum]
    [y : Fixnum]
    [width : Index]
@@ -42,11 +42,13 @@
    [blend : PSD-Blend-Mode]
    [opacity : Byte]
    [clipping : Byte]
-   [flags : (Listof Symbol)]
-   [mask : (Option PSD-Layer-Mask)]
-   [blending-ranges : PSD-Blending-Ranges]
-   [name : String])
+   [flags : (Listof Symbol)])
   #:transparent)
+
+(struct PSD-Layer-Record PSD-Layer-Header
+  ([mask : (Option PSD-Layer-Mask)]
+   [blending-ranges : PSD-Blending-Ranges]
+   [name : String] #|pascal name, rarely useful|#))
 
 (struct PSD-Layer-Mask
   ([x : Fixnum]

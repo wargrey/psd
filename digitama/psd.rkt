@@ -21,8 +21,7 @@
    [width : Positive-Index]
    [height : Positive-Index]
    [depth : Positive-Byte]
-   [color-mode : PSD-Color-Mode]
-   [compression-method : PSD-Compression-Method])
+   [color-mode : PSD-Color-Mode])
   #:transparent)
 
 (struct PSD-Section PSD-Header
@@ -32,6 +31,7 @@
    [global-mask : (U PSD-Global-Layer-Mask Bytes False)]
    [tagged-blocks : (U PSD-Layer-Infobase Bytes)]
    [image : (U (Instance Bitmap%) Bytes)]
+   [compression-method : PSD-Compression-Method]
    [special-size : Positive-Byte])
   #:mutable)
 

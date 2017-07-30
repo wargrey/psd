@@ -36,9 +36,9 @@
                       [(compression-method image-data) (read-psd-composite-image /dev/psdin)])
           (define make-psd (if (fx= ps-size 4) make-opaque-psd make-opaque-psb))
           (make-psd (string->unreadable-symbol (format "~a" (object-name /dev/psdin))) density
-                    channels width height depth color-mode compression-method color-mode-data image-resources
+                    channels width height depth color-mode color-mode-data image-resources
                     (or layer-info null) mask-info (or tagged-blocks (ann (make-hasheq) PSD-Layer-Infobase))
-                    image-data ps-size))
+                    image-data compression-method ps-size))
         (let-values ([(path scale) (select-psd-file /dev/psdin density try-@2x?)])
           (call-with-input-file* path (λ [[psdin : Input-Port]] (read-psd psdin #:backing-scale scale)))))))
 
@@ -69,7 +69,7 @@
                 (psd-image-data->bitmap 'psd-composite-bitmap image-data (PSD-Header-color-mode self)
                                         (PSD-Header-width self) (PSD-Header-height self)
                                         (PSD-Header-channels self) (PSD-Header-depth self)
-                                        (PSD-Header-compression-method self) (PSD-File-density self))))))
+                                        (PSD-Section-compression-method self) (PSD-File-density self))))))
 
 (define psd-thumbnail-bitmap : (-> PSD (Option (Instance Bitmap%)))
   (lambda [self]

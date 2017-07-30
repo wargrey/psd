@@ -107,12 +107,12 @@
 (define psd-layer-location : (-> PSD-Layer-Object (Values Fixnum Fixnum))
   (lambda [self]
     (define record : PSD-Layer-Record (PSD-Layer-Subject-record self))
-    (values (PSD-Layer-Record-x record) (PSD-Layer-Record-y record))))
+    (values (PSD-Layer-Header-x record) (PSD-Layer-Header-y record))))
 
 (define psd-layer-size : (-> PSD-Layer-Object (Values Fixnum Fixnum))
   (lambda [self]
     (define record : PSD-Layer-Record (PSD-Layer-Subject-record self))
-    (values (PSD-Layer-Record-width record) (PSD-Layer-Record-width record))))
+    (values (PSD-Layer-Header-width record) (PSD-Layer-Header-width record))))
 
 #;(define psd-layer-composite-bitmap : (-> PSD-Layer-Object (Instance Bitmap%))
   (lambda [self]
