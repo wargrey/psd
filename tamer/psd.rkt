@@ -10,7 +10,7 @@
 
 (for/list ([file.psd (in-directory tamer/)] #:when (psd? file.psd))
   (define tamer.psd (read-psd file.psd #:try-@2x? #false #:backing-scale 2.0))
-  (psd-profile tamer.psd)
+  (psd-profile tamer.psd #:resolve? #true)
   (list (path->string (file-name-from-path file.psd))
         (psd-layers tamer.psd #:resolve? #true)
         (psd-global-layer-mask tamer.psd)

@@ -41,7 +41,7 @@
    [height : Index]
    [blend : PSD-Blend-Mode]
    [opacity : Byte]
-   [base-clipping? : Boolean]
+   [clipping : Byte]
    [flags : (Listof Symbol)]
    [mask : (Option PSD-Layer-Mask)]
    [blending-ranges : PSD-Blending-Ranges]
