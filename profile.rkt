@@ -54,7 +54,7 @@
     (unless (not resolve?) (psd-layer-resolve-infobase self))
     (fprintf out "~aLocation: (~a, ~a)~n" ~t (PSD-Layer-Header-x record) (PSD-Layer-Header-y record))
     (fprintf out "~aSize: [~a * ~a]~n" ~t (PSD-Layer-Header-width record) (PSD-Layer-Header-height record))
-    (fprintf out "~aChannels: ~a~a~n" ~t +/- (for/list ([ch (in-list (PSD-Layer-Subject-channels self))]) (cons (car ch) (cadr ch))))
+    (fprintf out "~aChannels: ~a~a~n" ~t +/- ((inst map Integer PSD-Layer-Channel) car (PSD-Layer-Subject-channels self)))
     (fprintf out "~aBlend Mode: ~a~n" ~t (PSD-Layer-Header-blend record))
     (fprintf out "~aOpacity: ~a~n" ~t (PSD-Layer-Header-opacity record))
     (fprintf out "~aClipping: ~a~n" ~t (if (zero? (PSD-Layer-Header-clipping record)) 'base 'nonbase))
