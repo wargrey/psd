@@ -104,7 +104,7 @@
               (parse-int32 src (fx+ idx 4))
               (parse-int32 src (fx+ idx 8))
               (parse-int32 src (fx+ idx 12))))
-    (values top left (assert (fx- right left) index?) (assert (fx- bottom top) index?))))
+    (values left top (assert (fx- right left) index?) (assert (fx- bottom top) index?))))
 
 (define parse-mask-parameter : (-> Bytes Fixnum (Values PSD-Layer-Mask-Parameter Fixnum))
   (lambda [src idx]
