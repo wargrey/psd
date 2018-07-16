@@ -1,7 +1,5 @@
 #lang typed/racket/base
 
-(provide ~size planar-data->bitmap)
-
 (require typed/racket/unsafe)
 
 (require "../draw.rkt")
@@ -79,7 +77,7 @@
     (fill-rgb! pixels dest-idx source src-idx total)
     (unsafe-bytes-set! pixels (unsafe-fx+ dest-idx A) (unsafe-bytes-ref source (unsafe-fx+ src-idx (unsafe-fx* total 3))))))
 
-(unsafe-require/typed
+(unsafe-require/typed/provide
  (submod "." unsafe)
  [~size (-> Positive-Index Positive-Real Positive-Index)]
  [planar-data->bitmap (-> (U Bytes (Listof Bytes)) Positive-Fixnum Positive-Fixnum Byte Positive-Real (Instance Bitmap%))])
